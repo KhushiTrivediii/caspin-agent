@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enterprise AI Procurement Agent | Powered by Caspian SDK</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <div class="app-layout">
+    
+    <!-- Top Header -->
+    <header class="header">
+      <div class="brand-section">
+        <div class="brand-logo-badge">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          </svg>
+          <div class="pulse-indicator"></div>
+        </div>
+        <div>
+          <div class="brand-title">ProcureAI Enterprise</div>
+          <div class="brand-subtitle">
+            Autonomous Procurement Agent <span class="caspian-tag">Caspian SDK</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Channel Status Indicators -->
+      <div class="header-status-channels">
+        <div class="channel-pill active" title="Caspian Unified Multi-Channel Gateway">
+          <div class="dot"></div>
+          <span>Caspian Gateway</span>
+        </div>
+        <div class="channel-pill active" title="Telegram Bot Channel Ready">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.19-.08-.05-.19-.02-.27 0-.12.03-1.99 1.27-5.61 3.72-.53.36-1.01.54-1.44.53-.47-.01-1.38-.27-2.05-.49-.83-.27-1.49-.42-1.43-.88.03-.24.38-.49 1.03-.75 4.04-1.76 6.74-2.92 8.09-3.49 3.85-1.61 4.65-1.89 5.17-1.9.11 0 .37.03.54.17.14.12.18.28.2.45-.02.07-.02.21-.04.34z"/>
+          </svg>
+          <span>Telegram</span>
+        </div>
+        <div class="channel-pill active" title="Corporate Email Inbound/Outbound Engine">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+          </svg>
+          <span>Email</span>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="header-actions">
+        <button class="btn btn-glass btn-sm" id="btn-refresh-dashboard">
+          🔄 Refresh
+        </button>
+        <button class="btn btn-primary" id="btn-open-create-modal">
+          ✨ New Request
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      
+      <!-- KPI Metrics Grid -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div>
+            <div class="kpi-title">Total Requests</div>
+            <div class="kpi-value" id="kpi-total-requests">--</div>
+            <div class="kpi-subtitle">Across Telegram & Email</div>
+          </div>
+          <div class="kpi-icon-box">📦</div>
+        </div>
+
+        <div class="kpi-card pending-approval">
+          <div>
+            <div class="kpi-title">Pending Approvals</div>
+            <div class="kpi-value" id="kpi-pending-approvals" style="color: #fbbf24;">--</div>
+            <div class="kpi-subtitle">Awaiting Manager Action</div>
+          </div>
+          <div class="kpi-icon-box" style="border-color: rgba(245, 158, 11, 0.3);">⏳</div>
+        </div>
+
+        <div class="kpi-card">
+          <div>
+            <div class="kpi-title">Committed Spend</div>
+            <div class="kpi-value" id="kpi-committed-spend">--</div>
+            <div class="kpi-subtitle">Approved Orders</div>
+          </div>
+          <div class="kpi-icon-box">💳</div>
+        </div>
+
+        <div class="kpi-card savings-highlight">
+          <div>
+            <div class="kpi-title">Total Cost Savings</div>
+            <div class="kpi-value" id="kpi-total-savings" style="color: #34d399;">--</div>
+            <div class="kpi-subtitle">Via AI Vendor Negotiation</div>
+          </div>
+          <div class="kpi-icon-box" style="border-color: rgba(16, 185, 129, 0.3);">💰</div>
+        </div>
+      </div>
+
+      <!-- Main Dual Panel Section -->
+      <div class="dashboard-grid">
+        
+        <!-- Left Panel: Procurement Workflow Tracker -->
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title-area">
+              <div class="panel-title">Procurement Workflow Pipeline</div>
+              <div class="badge-count" id="pipeline-count">0 Tickets</div>
+            </div>
+
+            <!-- Controls: Search & Tabs -->
+            <div class="controls-bar">
+              <div class="search-input-wrap">
+                <span class="search-icon">🔍</span>
+                <input type="text" class="search-input" id="search-input" placeholder="Search item, ID, requester...">
+              </div>
+
+              <div class="filter-tabs" id="status-filter-tabs">
+                <div class="filter-tab active" data-status="">All</div>
+                <div class="filter-tab" data-status="Approval Pending">Pending</div>
+                <div class="filter-tab" data-status="Approved">Approved</div>
+                <div class="filter-tab" data-status="Open">Open</div>
+                <div class="filter-tab" data-status="Completed">Completed</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Cards List -->
+          <div class="procurement-list" id="procurement-cards-container">
+            <!-- Dynamic cards injected by JS -->
+          </div>
+        </div>
+
+        <!-- Right Panel: Live Multi-Channel Simulator -->
+        <div class="panel simulator-panel">
+          <div class="panel-header">
+            <div class="panel-title-area">
+              <div class="panel-title">Channel Simulator</div>
+            </div>
+            <span class="caspian-tag">Live Sandbox</span>
+          </div>
+
+          <div style="padding: 16px 20px; display: flex; flex-direction: column; flex: 1;">
+            
+            <!-- Channel Switcher -->
+            <div class="simulator-channel-switch">
+              <button class="sim-switch-btn active telegram" id="sim-tab-telegram" data-channel="telegram">
+                ✈️ Telegram Bot
+              </button>
+              <button class="sim-switch-btn email" id="sim-tab-email" data-channel="email">
+                ✉️ Corporate Email
+              </button>
+            </div>
+
+            <!-- Quick Example Prompts from User Request -->
+            <div class="quick-prompts">
+              <button class="quick-prompt-btn" data-text="Need 100 laptops.">
+                1. "Need 100 laptops."
+              </button>
+              <button class="quick-prompt-btn" data-text="Budget is 45 lakhs and delivery in 10 days with i5, 16GB RAM, 512GB SSD">
+                2. "Budget 45L, 10 days..."
+              </button>
+              <button class="quick-prompt-btn" data-text="APPROVE">
+                3. "APPROVE"
+              </button>
+              <button class="quick-prompt-btn" data-text="Procure 25 ergonomic standing desks within 3 weeks budget 8 Lakhs">
+                4. "25 Desks, 8L..."
+              </button>
+            </div>
+
+            <!-- Live Chat Bubbles Stream -->
+            <div class="chat-stream" id="chat-stream">
+              <div class="chat-bubble agent">
+                <div class="agent-tag">🤖 Caspian Procurement Bot</div>
+                <div>Hello! I'm your AI Procurement Agent. Send me any procurement request or respond to pending approvals.</div>
+                <div class="bubble-time">Just now</div>
+              </div>
+            </div>
+
+            <!-- Message Input Area -->
+            <form id="chat-form" class="chat-input-area">
+              <input type="text" id="chat-input" class="chat-input" placeholder="Type message (e.g. 'Need 100 laptops.')..." autocomplete="off">
+              <button type="submit" class="btn btn-primary btn-sm">Send</button>
+            </form>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- Modal 1: Procurement Details & Vendor Matrix -->
+    <div class="modal-backdrop" id="ticket-modal">
+      <div class="modal-box">
+        <div class="modal-header">
+          <div>
+            <div class="modal-title" id="modal-ticket-id">PROC-2026-XXX</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted);" id="modal-ticket-title">Title</div>
+          </div>
+          <button class="close-btn" id="btn-close-ticket-modal">&times;</button>
+        </div>
+
+        <div id="modal-ticket-content">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal 2: Create New Procurement Request -->
+    <div class="modal-backdrop" id="create-modal">
+      <div class="modal-box">
+        <div class="modal-header">
+          <div class="modal-title">Create Procurement Request</div>
+          <button class="close-btn" id="btn-close-create-modal">&times;</button>
+        </div>
+
+        <form id="form-create-procurement">
+          <div class="form-group">
+            <label class="form-label">Product Name / Category</label>
+            <input type="text" id="create-product" class="form-control" placeholder="e.g. Laptop, Server, Monitor, Office Chair" required>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Quantity</label>
+              <input type="number" id="create-quantity" class="form-control" placeholder="100" min="1" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Budget (INR ₹)</label>
+              <input type="number" id="create-budget" class="form-control" placeholder="4500000" min="100" required>
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Required Delivery Timeline (Days)</label>
+              <input type="number" id="create-delivery" class="form-control" placeholder="10" min="1" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Origin Channel</label>
+              <select id="create-channel" class="form-control">
+                <option value="telegram">Telegram</option>
+                <option value="email">Corporate Email</option>
+                <option value="web">Web Dashboard</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Specifications (comma separated)</label>
+            <input type="text" id="create-specs" class="form-control" placeholder="i5 13th Gen, 16GB RAM, 512GB SSD, 3-Year Onsite">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Requester Name</label>
+            <input type="text" id="create-requester" class="form-control" placeholder="Engineering Lead / Manager">
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+            <button type="button" class="btn btn-glass" id="btn-cancel-create">Cancel</button>
+            <button type="submit" class="btn btn-primary">🚀 Launch Procurement</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
