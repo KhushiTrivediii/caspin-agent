@@ -17,6 +17,8 @@ from backend.models import (
     NegotiationStatus,
     RiskAlert,
     RiskLevel,
+    PurchaseOrder,
+    PurchaseOrderItem,
 )
 
 DB_PATH = Path("./procurements.db")
@@ -52,7 +54,43 @@ async def init_db():
                 approval_timestamp TEXT,
                 summary TEXT,
                 created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
+                updated_at TEXT NOT NULL,
+                approval_tier TEXT DEFAULT 'Tier 2 (Department Manager)',
+                po_number TEXT
+            )
+            """
+        )
+
+        # Database Migrations (Run columns additions inside try-except for backward-compatibility)
+        try:
+            await db.execute("ALTER TABLE procurements ADD COLUMN approval_tier TEXT DEFAULT 'Tier 2 (Department Manager)'")
+        except sqlite3.OperationalError:
+            pass  # Already exists
+
+        try:
+            await db.execute("ALTER TABLE procurements ADD COLUMN po_number TEXT")
+        except sqlite3.OperationalError:
+            pass  # Already exists
+
+        await db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS purchase_orders (
+                po_number TEXT PRIMARY KEY,
+                procurement_id TEXT NOT NULL,
+                vendor_name TEXT NOT NULL,
+                vendor_email TEXT NOT NULL,
+                subtotal REAL NOT NULL,
+                tax_rate REAL DEFAULT 0.18,
+                tax_amount REAL NOT NULL,
+                total_amount REAL NOT NULL,
+                delivery_timeline_days INTEGER NOT NULL,
+                payment_terms TEXT,
+                shipping_address TEXT,
+                status TEXT,
+                approved_by TEXT,
+                items_json TEXT,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (procurement_id) REFERENCES procurements (id)
             )
             """
         )
@@ -446,8 +484,9 @@ async def create_procurement(ticket: ProcurementTicket) -> ProcurementTicket:
                 id, title, product, quantity, budget, currency, delivery_days,
                 specifications, status, current_stage, requester_id, requester_name,
                 requester_email, channel, recommended_vendor, recommended_price,
-                recommended_delivery_days, summary, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                recommended_delivery_days, summary, created_at, updated_at,
+                approval_tier, po_number
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 ticket.id,
@@ -470,6 +509,8 @@ async def create_procurement(ticket: ProcurementTicket) -> ProcurementTicket:
                 ticket.summary,
                 ticket.created_at.isoformat(),
                 ticket.updated_at.isoformat(),
+                ticket.approval_tier,
+                ticket.po_number,
             ),
         )
 
@@ -589,6 +630,8 @@ async def get_procurement(procurement_id: str) -> Optional[ProcurementTicket]:
             summary=row["summary"],
             created_at=datetime.fromisoformat(row["created_at"]),
             updated_at=datetime.fromisoformat(row["updated_at"]),
+            approval_tier=row["approval_tier"] or "Tier 2 (Department Manager)",
+            po_number=row["po_number"],
         )
 
 
@@ -716,6 +759,13 @@ async def record_approval_decision(
             ),
         )
         await db.commit()
+
+    if status == "APPROVED":
+        ticket = await get_procurement(procurement_id)
+        if ticket:
+            from backend.po_generator import po_engine
+            po = po_engine.generate_purchase_order(ticket, approver)
+            await save_purchase_order(po)
 
 
 async def save_channel_message(msg: ChannelMessage):
@@ -920,3 +970,125 @@ async def get_dashboard_stats() -> Dict[str, Any]:
             "total_negotiations": neg_count,
             "recent_activities": recent_logs,
         }
+
+
+async def save_purchase_order(po: PurchaseOrder) -> PurchaseOrder:
+    """Save a generated Purchase Order into the database and update procurement ticket linking."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        # Save PO
+        items_data = json.dumps([item.dict() for item in po.items])
+        await db.execute(
+            """
+            INSERT INTO purchase_orders (
+                po_number, procurement_id, vendor_name, vendor_email, subtotal,
+                tax_rate, tax_amount, total_amount, delivery_timeline_days,
+                payment_terms, shipping_address, status, approved_by, items_json, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(po_number) DO UPDATE SET
+                status=excluded.status,
+                approved_by=excluded.approved_by,
+                total_amount=excluded.total_amount
+            """,
+            (
+                po.po_number,
+                po.procurement_id,
+                po.vendor_name,
+                po.vendor_email,
+                po.subtotal,
+                po.tax_rate,
+                po.tax_amount,
+                po.total_amount,
+                po.delivery_timeline_days,
+                po.payment_terms,
+                po.shipping_address,
+                po.status,
+                po.approved_by,
+                items_data,
+                po.created_at.isoformat() if hasattr(po.created_at, "isoformat") else str(po.created_at),
+            ),
+        )
+
+        # Update link on procurement ticket
+        await db.execute(
+            "UPDATE procurements SET po_number = ? WHERE id = ?",
+            (po.po_number, po.procurement_id),
+        )
+        await db.commit()
+    return po
+
+
+async def get_purchase_order(procurement_id: str) -> Optional[PurchaseOrder]:
+    """Retrieve Purchase Order for a specific procurement ticket."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute("SELECT * FROM purchase_orders WHERE procurement_id = ?", (procurement_id,))
+        row = await cursor.fetchone()
+        if not row:
+            return None
+
+        items_list = json.loads(row["items_json"] or "[]")
+        items = [
+            PurchaseOrderItem(
+                item_description=item["item_description"],
+                quantity=item["quantity"],
+                unit_price=item["unit_price"],
+                total_price=item["total_price"],
+            )
+            for item in items_list
+        ]
+
+        return PurchaseOrder(
+            po_number=row["po_number"],
+            procurement_id=row["procurement_id"],
+            vendor_name=row["vendor_name"],
+            vendor_email=row["vendor_email"],
+            items=items,
+            subtotal=row["subtotal"],
+            tax_rate=row["tax_rate"],
+            tax_amount=row["tax_amount"],
+            total_amount=row["total_amount"],
+            delivery_timeline_days=row["delivery_timeline_days"],
+            payment_terms=row["payment_terms"],
+            shipping_address=row["shipping_address"],
+            status=row["status"],
+            approved_by=row["approved_by"],
+            created_at=datetime.fromisoformat(row["created_at"]),
+        )
+
+
+async def add_vendor_quote_to_db(procurement_id: str, quote: VendorQuote):
+    """Add a vendor quote to an existing procurement ticket in the database."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            """
+            INSERT INTO vendor_quotes (
+                id, procurement_id, vendor_name, price, currency, delivery_days,
+                specs_matched, rating, warranty_years, savings_amount,
+                savings_percentage, is_recommended, quote_notes, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                quote.id,
+                procurement_id,
+                quote.vendor_name,
+                quote.price,
+                quote.currency,
+                quote.delivery_days,
+                json.dumps(quote.specs_matched),
+                quote.rating,
+                quote.warranty_years,
+                quote.savings_amount,
+                quote.savings_percentage,
+                1 if quote.is_recommended else 0,
+                quote.quote_notes,
+                quote.created_at.isoformat(),
+            ),
+        )
+
+        # Clear recommendations first to let new recommendation engine pick the best
+        await db.execute(
+            "UPDATE vendor_quotes SET is_recommended = 0 WHERE procurement_id = ?",
+            (procurement_id,),
+        )
+        await db.commit()
+

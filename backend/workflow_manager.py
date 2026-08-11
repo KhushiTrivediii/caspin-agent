@@ -24,7 +24,9 @@ from backend.database import (
     save_conversation_state,
     clear_conversation_state,
     save_channel_message,
+    save_purchase_order,
 )
+from backend.po_generator import po_engine
 from backend.ai_engine import ai_engine
 from backend.caspian_service import caspian_service
 
@@ -159,6 +161,7 @@ class WorkflowManager:
             specifications=req.specifications,
             status=ProcurementStatus.APPROVAL_PENDING,
             current_stage="Approval Pending",
+            approval_tier=po_engine.determine_approval_tier(req.budget or 0.0),
             requester_id=sender_id,
             requester_name=sender_name,
             requester_email=sender_email,

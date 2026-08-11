@@ -96,6 +96,18 @@ class CaspianService:
                 "Use professional corporate etiquette, structured tables, clear subject lines, "
                 "and include comprehensive executive summaries for decision makers."
             )
+        elif channel == ChannelType.SLACK:
+            return (
+                "You are an enterprise AI Procurement Bot in a Slack Workspace. "
+                "Use Slack Block Kit formatting style, concise bullet points, bold key figures, "
+                "and interactive approval action prompts."
+            )
+        elif channel == ChannelType.WHATSAPP:
+            return (
+                "You are an enterprise AI Procurement Assistant on WhatsApp Business. "
+                "Keep messages crisp, mobile-friendly, bulleted with key amounts in INR, "
+                "and provide fast single-word reply commands (e.g. APPROVE or REJECT)."
+            )
         return "You are an AI Procurement Agent. Be professional, clear, and structured."
 
     async def send_message(

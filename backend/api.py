@@ -1,6 +1,7 @@
+import aiosqlite
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, HTMLResponse
 
 from backend.models import (
     ProcurementTicket,
@@ -23,6 +24,9 @@ from backend.models import (
     NegotiationThread,
     RecommendationRequest,
     SupplierRecommendation,
+    PurchaseOrder,
+    ManualQuoteInput,
+    VendorQuote,
 )
 from backend.database import (
     list_procurements,
@@ -35,6 +39,9 @@ from backend.database import (
     get_dashboard_stats,
     list_vendors,
     list_negotiations,
+    save_purchase_order,
+    get_purchase_order,
+    add_vendor_quote_to_db,
 )
 from backend.ai_engine import ai_engine
 from backend.workflow_manager import workflow_manager
@@ -360,3 +367,136 @@ async def get_stats():
 async def get_ticket_audit_logs(procurement_id: str):
     """Get audit trail logs for a procurement ticket."""
     return await get_audit_logs(procurement_id)
+
+
+# ---------------------------------------------------------
+# New Enterprise PO, Quote Ingestion & Export Endpoints
+# ---------------------------------------------------------
+
+@router.post("/procurement/{id}/quotes", response_model=ProcurementTicket)
+async def ingest_custom_quote(id: str, quote_in: ManualQuoteInput):
+    """
+    Ingest a custom vendor quote, add it to the ticket, and re-run recommendation.
+    """
+    ticket = await get_procurement(id)
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Procurement ticket not found.")
+
+    import uuid
+    from datetime import datetime
+    from backend.po_generator import po_engine
+
+    # Convert ManualQuoteInput to VendorQuote
+    new_quote = VendorQuote(
+        id=f"QUOTE-{uuid.uuid4().hex[:8].upper()}",
+        vendor_name=quote_in.vendor_name,
+        price=quote_in.price,
+        delivery_days=quote_in.delivery_days,
+        warranty_years=quote_in.warranty_years,
+        vendor_rating=quote_in.vendor_rating or 4.5,
+        reliability_score=quote_in.reliability_score or 90.0,
+        specs_matched=ticket.specifications,
+        is_recommended=False,
+        savings_amount=0.0,
+        savings_percentage=0.0,
+    )
+
+    await add_vendor_quote_to_db(id, new_quote)
+
+    # Reload the ticket with all quotes
+    updated_ticket = await get_procurement(id)
+    
+    # Calculate recommended quote
+    from backend.models import QuotationInput
+    scoring_quotes = [
+        QuotationInput(
+            vendor_name=q.vendor_name,
+            price=q.price,
+            delivery_days=q.delivery_days,
+            warranty_years=q.warranty_years,
+            vendor_rating=q.rating,
+            reliability_score=q.reliability_score,
+            specs_matched=q.specs_matched,
+        )
+        for q in updated_ticket.quotes
+    ]
+
+    if scoring_quotes:
+        rec = vendor_intelligence.recommend_supplier(
+            product=updated_ticket.product,
+            quantity=updated_ticket.quantity,
+            budget=updated_ticket.budget,
+            quotes=scoring_quotes,
+        )
+
+        # Update the recommended vendor on the ticket in database
+        async with aiosqlite.connect("./procurements.db") as db:
+            await db.execute(
+                """
+                UPDATE procurements
+                SET recommended_vendor = ?,
+                    recommended_price = ?,
+                    recommended_delivery_days = ?,
+                    summary = ?
+                WHERE id = ?
+                """,
+                (
+                    rec.recommended_vendor,
+                    rec.recommended_price,
+                    rec.recommended_delivery_days or 7,
+                    rec.reasons[1] if len(rec.reasons) > 1 else (rec.reasons[0] if rec.reasons else "Recommendation updated"),
+                    id,
+                ),
+            )
+            # Mark recommended quote in DB
+            await db.execute(
+                "UPDATE vendor_quotes SET is_recommended = 1 WHERE procurement_id = ? AND vendor_name = ?",
+                (id, rec.recommended_vendor),
+            )
+            await db.commit()
+
+    # Return refreshed ticket
+    return await get_procurement(id)
+
+
+@router.get("/procurement/{id}/po", response_model=PurchaseOrder)
+async def get_po_endpoint(id: str):
+    """Retrieve the generated Purchase Order for an approved procurement ticket."""
+    po = await get_purchase_order(id)
+    if not po:
+        raise HTTPException(
+            status_code=404,
+            detail="Purchase Order not found. Ensure the ticket has been approved by the manager to issue a PO."
+        )
+    return po
+
+
+@router.get("/procurement/{id}/po/html", response_class=HTMLResponse)
+async def get_po_html_endpoint(id: str):
+    """Generate and view the formatted, printable corporate Purchase Order document."""
+    po = await get_purchase_order(id)
+    ticket = await get_procurement(id)
+    if not po or not ticket:
+        raise HTTPException(
+            status_code=404,
+            detail="PO or ticket not found. Ensure the ticket is approved."
+        )
+    from backend.po_generator import po_engine
+    return po_engine.generate_po_html(po, ticket)
+
+
+@router.get("/export/procurements/csv", response_class=PlainTextResponse)
+async def export_csv_endpoint():
+    """Export all procurement records as a CSV download."""
+    tickets = await list_procurements(limit=200)
+    from backend.po_generator import po_engine
+    csv_data = po_engine.export_procurements_csv(tickets)
+    return csv_data
+
+
+@router.get("/export/procurements/json", response_model=List[ProcurementTicket])
+async def export_json_endpoint():
+    """Export all procurement records as structured JSON."""
+    tickets = await list_procurements(limit=200)
+    return tickets
+

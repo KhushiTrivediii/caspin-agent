@@ -203,6 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="ticket-meta-line">
             <span>Quantity: <b>${ticket.quantity}</b></span>
             <span>Target Delivery: <b>${ticket.delivery_days} Days</b></span>
+            <span>Route: <b style="color: var(--primary-text);">${ticket.approval_tier}</b></span>
             ${specsLine}
           </div>
 
@@ -227,6 +228,11 @@ document.addEventListener('DOMContentLoaded', () => {
               <button class="btn btn-secondary btn-sm btn-ticket-details" data-id="${ticket.id}">
                 Details
               </button>
+              ${ticket.po_number ? `
+                <a href="/procurement/${ticket.id}/po/html" target="_blank" class="btn btn-secondary btn-sm" style="background: var(--success-subtle); color: var(--success-text); border-color: #a7f3d0;">
+                  View PO
+                </a>
+              ` : ''}
               ${isPending ? `
                 <button class="btn btn-success btn-sm btn-ticket-approve" data-id="${ticket.id}">
                   Approve
@@ -481,9 +487,16 @@ document.addEventListener('DOMContentLoaded', () => {
         <div style="background: var(--bg-surface); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); margin-bottom: 16px;">
           <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Executive Summary</div>
           <div style="font-size: 13px; margin-top: 2px; color: var(--text-primary);">${escapeHtml(ticket.summary || 'Summary unavailable')}</div>
+          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-top: 8px;">Approval Routing Tier</div>
+          <div style="font-size: 12px; font-weight: 600; color: var(--primary-text); margin-top: 2px;">${ticket.approval_tier}</div>
         </div>
 
-        <div style="font-weight: 600; font-size: 13px; margin-bottom: 8px;">Vendor Quotations Matrix</div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <div style="font-weight: 600; font-size: 13px;">Vendor Quotations Matrix</div>
+          <button class="btn btn-secondary btn-sm" id="btn-trigger-add-quote" style="padding: 4px 8px; font-size: 11px;">
+            + Ingest Custom Quote
+          </button>
+        </div>
         <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 16px;">
           <thead>
             <tr style="color: var(--text-muted); border-bottom: 1px solid var(--border-subtle); text-align: left;">
@@ -499,17 +512,28 @@ document.addEventListener('DOMContentLoaded', () => {
           </tbody>
         </table>
 
-        ${ticket.status === 'Approval Pending' ? `
-          <div style="display: flex; gap: 8px; margin-top: 16px; border-top: 1px solid var(--border-subtle); padding-top: 14px;">
+        <div style="display: flex; gap: 8px; margin-top: 16px; border-top: 1px solid var(--border-subtle); padding-top: 14px;">
+          ${ticket.status === 'Approval Pending' ? `
             <button class="btn btn-success btn-sm" style="flex: 1;" id="modal-action-approve">
               Approve (${formatINR(ticket.recommended_price)})
             </button>
             <button class="btn btn-danger btn-sm" style="flex: 1;" id="modal-action-reject">
               Reject Request
             </button>
-          </div>
-        ` : ''}
+          ` : ''}
+          ${ticket.po_number ? `
+            <a href="/procurement/${ticket.id}/po/html" target="_blank" class="btn btn-primary btn-sm" style="flex: 1; text-align: center;">
+              Print Official Purchase Order
+            </a>
+          ` : ''}
+        </div>
       `;
+
+      // Ingest Custom Quote handler
+      document.getElementById('btn-trigger-add-quote').addEventListener('click', () => {
+        document.getElementById('inp-quote-ticket-id').value = ticket.id;
+        document.getElementById('quote-modal').classList.add('open');
+      });
 
       if (ticket.status === 'Approval Pending') {
         document.getElementById('modal-action-approve')?.addEventListener('click', async () => {
@@ -551,18 +575,25 @@ document.addEventListener('DOMContentLoaded', () => {
   // ---------------------------------------------------------
   // Channel Interface Simulator
   // ---------------------------------------------------------
-  channelBtnTg.addEventListener('click', () => {
-    state.activeSimChannel = 'telegram';
-    channelBtnTg.classList.add('active');
-    channelBtnEmail.classList.remove('active');
-    chatInput.placeholder = "Enter Telegram message...";
-  });
+  const channelBtns = [
+    { id: 'channel-btn-tg', channel: 'telegram', placeholder: 'Enter Telegram message...' },
+    { id: 'channel-btn-email', channel: 'email', placeholder: 'Enter Email requirement...' },
+    { id: 'channel-btn-slack', channel: 'slack', placeholder: 'Enter Slack message or /procure...' },
+    { id: 'channel-btn-wa', channel: 'whatsapp', placeholder: 'Enter WhatsApp text (e.g. APPROVE)...' }
+  ];
 
-  channelBtnEmail.addEventListener('click', () => {
-    state.activeSimChannel = 'email';
-    channelBtnEmail.classList.add('active');
-    channelBtnTg.classList.remove('active');
-    chatInput.placeholder = "Enter Email requirement...";
+  channelBtns.forEach(btnConfig => {
+    const btn = document.getElementById(btnConfig.id);
+    if (btn) {
+      btn.addEventListener('click', () => {
+        state.activeSimChannel = btnConfig.channel;
+        channelBtns.forEach(b => {
+          document.getElementById(b.id)?.classList.remove('active');
+        });
+        btn.classList.add('active');
+        chatInput.placeholder = btnConfig.placeholder;
+      });
+    }
   });
 
   hintPills.forEach(pill => {
@@ -717,10 +748,59 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Close modals on backdrop click
+  const quoteModal = document.getElementById('quote-modal');
+  const formAddQuote = document.getElementById('form-add-quote');
+
+  document.getElementById('btn-close-quote-modal')?.addEventListener('click', () => quoteModal.classList.remove('open'));
+  document.getElementById('btn-cancel-quote')?.addEventListener('click', () => quoteModal.classList.remove('open'));
+
+  formAddQuote?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const ticketId = document.getElementById('inp-quote-ticket-id').value;
+    const vendor_name = document.getElementById('inp-quote-vendor').value;
+    const price = parseFloat(document.getElementById('inp-quote-price').value);
+    const delivery_days = parseInt(document.getElementById('inp-quote-delivery').value);
+    const warranty_years = parseInt(document.getElementById('inp-quote-warranty').value);
+    const vendor_rating = parseFloat(document.getElementById('inp-quote-rating').value || '4.5');
+
+    try {
+      const res = await fetch(`/procurement/${ticketId}/quotes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vendor_name,
+          price,
+          delivery_days,
+          warranty_years,
+          vendor_rating,
+        })
+      });
+
+      if (res.ok) {
+        formAddQuote.reset();
+        quoteModal.classList.remove('open');
+        ticketModal.classList.remove('open');
+        await loadDashboard();
+      }
+    } catch (err) {
+      console.error('Error adding quote:', err);
+    }
+  });
+
+  // Export handlers
+  document.getElementById('btn-export-csv')?.addEventListener('click', () => {
+    window.location.href = '/export/procurements/csv';
+  });
+
+  document.getElementById('btn-export-json')?.addEventListener('click', () => {
+    window.location.href = '/export/procurements/json';
+  });
+
   window.addEventListener('click', (e) => {
     if (e.target === ticketModal) ticketModal.classList.remove('open');
     if (e.target === createModal) createModal.classList.remove('open');
     if (e.target === reportModal) reportModal.classList.remove('open');
+    if (e.target === quoteModal) quoteModal.classList.remove('open');
   });
 
   function escapeHtml(text) {

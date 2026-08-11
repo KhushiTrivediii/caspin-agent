@@ -74,6 +74,8 @@
             </div>
 
             <div style="display: flex; align-items: center; gap: 8px;">
+              <button class="btn btn-secondary btn-sm" id="btn-export-csv" style="padding: 4px 8px; font-size: 11px; font-weight: 600;">CSV</button>
+              <button class="btn btn-secondary btn-sm" id="btn-export-json" style="padding: 4px 8px; font-size: 11px; font-weight: 600;">JSON</button>
               <input type="text" class="search-control" id="search-query" placeholder="Filter by product, ID...">
               <div class="filter-group" id="filter-tabs">
                 <button class="filter-chip active" data-status="">All</button>
@@ -99,6 +101,8 @@
           <div class="channel-tabs">
             <button class="channel-tab-btn active" id="channel-btn-tg" data-channel="telegram">Telegram</button>
             <button class="channel-tab-btn" id="channel-btn-email" data-channel="email">Email</button>
+            <button class="channel-tab-btn" id="channel-btn-slack" data-channel="slack">Slack</button>
+            <button class="channel-tab-btn" id="channel-btn-wa" data-channel="whatsapp">WhatsApp</button>
           </div>
 
           <div class="chat-prompt-hints">
@@ -272,6 +276,47 @@
         <button class="modal-close" id="btn-close-report">&times;</button>
       </div>
       <pre id="report-modal-content" style="background: var(--bg-input); border: 1px solid var(--border-subtle); padding: 16px; border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 12px; color: var(--text-primary); white-space: pre-wrap; line-height: 1.5; max-height: 60vh; overflow-y: auto;"></pre>
+    </div>
+  </div>
+
+  <!-- Modal 4: Add Custom Quote -->
+  <div class="modal-backdrop" id="quote-modal">
+    <div class="modal-content">
+      <div class="modal-header-line">
+        <span class="surface-title">Ingest Custom Vendor Quote</span>
+        <button class="modal-close" id="btn-close-quote-modal">&times;</button>
+      </div>
+      <form id="form-add-quote">
+        <input type="hidden" id="inp-quote-ticket-id">
+        <div class="form-group">
+          <label class="form-label">Vendor Name</label>
+          <input type="text" id="inp-quote-vendor" class="form-control" placeholder="e.g. Acer Commercial Direct" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Price (₹ INR)</label>
+            <input type="number" id="inp-quote-price" class="form-control" placeholder="4200000" min="100" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Delivery Days</label>
+            <input type="number" id="inp-quote-delivery" class="form-control" placeholder="7" min="1" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Warranty (Years)</label>
+            <input type="number" id="inp-quote-warranty" class="form-control" placeholder="3" min="1" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Vendor Rating</label>
+            <input type="number" id="inp-quote-rating" class="form-control" placeholder="4.5" step="0.1" min="1" max="5">
+          </div>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-cancel-quote">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">Add & Re-Score</button>
+        </div>
+      </form>
     </div>
   </div>
 
