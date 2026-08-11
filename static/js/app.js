@@ -1,13 +1,11 @@
 /**
- * Enterprise AI Procurement Agent & Vendor Intelligence Engine
- * Frontend Controller & API Integration
+ * ProcureAI - Minimal, Modern & Energetic Frontend Controller
  */
 
 document.addEventListener('DOMContentLoaded', () => {
   // Application State
   const state = {
     procurements: [],
-    vendors: [],
     negotiations: [],
     stats: null,
     activeStatusFilter: '',
@@ -17,11 +15,12 @@ document.addEventListener('DOMContentLoaded', () => {
     simSenderName: 'Sarah Chen (Lead)',
   };
 
-  // Top Nav Elements
-  const tabNavWorkflow = document.getElementById('tab-nav-workflow');
-  const tabNavVi = document.getElementById('tab-nav-vi');
-  const viewProcurement = document.getElementById('view-procurement');
-  const viewVendorIntelligence = document.getElementById('view-vendor-intelligence');
+  // Nav Tabs
+  const tabBtnWorkflow = document.getElementById('tab-btn-workflow');
+  const tabBtnVi = document.getElementById('tab-btn-vi');
+  const viewWorkflow = document.getElementById('view-workflow');
+  const viewVi = document.getElementById('view-vi');
+  const brandHome = document.getElementById('brand-home');
 
   // KPI Elements
   const kpiTotalRequests = document.getElementById('kpi-total-requests');
@@ -34,7 +33,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const pipelineCount = document.getElementById('pipeline-count');
   const searchInput = document.getElementById('search-input');
   const filterTabs = document.getElementById('status-filter-tabs');
-  const btnRefresh = document.getElementById('btn-refresh-dashboard');
 
   // Simulator Elements
   const simTabTelegram = document.getElementById('sim-tab-telegram');
@@ -42,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const chatStream = document.getElementById('chat-stream');
   const chatForm = document.getElementById('chat-form');
   const chatInput = document.getElementById('chat-input');
-  const quickPromptBtns = document.querySelectorAll('.quick-prompt-btn');
+  const quickChips = document.querySelectorAll('.chip-btn');
 
   // Vendor Intelligence Elements
   const btnRunSampleAnalysis = document.getElementById('btn-run-sample-analysis');
@@ -52,9 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const scoringMatrixContainer = document.getElementById('scoring-matrix-container');
   const riskRadarContainer = document.getElementById('risk-radar-container');
   const riskCountBadge = document.getElementById('risk-count-badge');
-  const vendorDirectoryContainer = document.getElementById('vendor-directory-container');
   const negotiationsContainer = document.getElementById('negotiations-container');
-  const viVendorSearch = document.getElementById('vi-vendor-search');
 
   // Modals Elements
   const ticketModal = document.getElementById('ticket-modal');
@@ -81,29 +77,27 @@ document.addEventListener('DOMContentLoaded', () => {
     return (status || '').toLowerCase().replace(/\s+/g, '-');
   }
 
-  function getChannelIcon(channel) {
-    if (channel === 'telegram') return '✈️ Telegram';
-    if (channel === 'email') return '✉️ Email';
-    return '🌐 Web';
+  // ---------------------------------------------------------
+  // Tab Navigation
+  // ---------------------------------------------------------
+  function switchView(target) {
+    if (target === 'view-workflow') {
+      tabBtnWorkflow.classList.add('active');
+      tabBtnVi.classList.remove('active');
+      viewWorkflow.classList.add('active-view');
+      viewVi.classList.remove('active-view');
+    } else {
+      tabBtnVi.classList.add('active');
+      tabBtnWorkflow.classList.remove('active');
+      viewVi.classList.add('active-view');
+      viewWorkflow.classList.remove('active-view');
+      fetchNegotiations();
+    }
   }
 
-  // ---------------------------------------------------------
-  // View Navigation
-  // ---------------------------------------------------------
-  tabNavWorkflow.addEventListener('click', () => {
-    tabNavWorkflow.classList.add('active');
-    tabNavVi.classList.remove('active');
-    viewProcurement.classList.add('active-view');
-    viewVendorIntelligence.classList.remove('active-view');
-  });
-
-  tabNavVi.addEventListener('click', () => {
-    tabNavVi.classList.add('active');
-    tabNavWorkflow.classList.remove('active');
-    viewVendorIntelligence.classList.add('active-view');
-    viewProcurement.classList.remove('active-view');
-    loadVendorIntelligenceData();
-  });
+  tabBtnWorkflow.addEventListener('click', () => switchView('view-workflow'));
+  tabBtnVi.addEventListener('click', () => switchView('view-vi'));
+  brandHome.addEventListener('click', () => switchView('view-workflow'));
 
   // ---------------------------------------------------------
   // Data Loaders
@@ -144,22 +138,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  async function loadVendorIntelligenceData() {
-    await Promise.all([fetchVendors(), fetchNegotiations()]);
-  }
-
-  async function fetchVendors() {
-    try {
-      const res = await fetch('/vendors');
-      if (!res.ok) return;
-      const data = await res.json();
-      state.vendors = data;
-      renderVendorDirectory(data);
-    } catch (err) {
-      console.error('Error fetching vendors:', err);
-    }
-  }
-
   async function fetchNegotiations() {
     try {
       const res = await fetch('/negotiations');
@@ -184,17 +162,17 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ---------------------------------------------------------
-  // Render Procurement Cards
+  // Render Clean Procurement Cards
   // ---------------------------------------------------------
   function renderCards(tickets) {
     pipelineCount.textContent = `${tickets.length} Ticket${tickets.length === 1 ? '' : 's'}`;
 
     if (!tickets || tickets.length === 0) {
       cardsContainer.innerHTML = `
-        <div style="text-align: center; padding: 48px 20px; color: var(--text-muted);">
-          <div style="font-size: 2.2rem; margin-bottom: 8px;">📭</div>
-          <div style="font-weight: 600; color: var(--text-secondary);">No procurement requests found</div>
-          <div style="font-size: 0.8rem; margin-top: 4px;">Use the Channel Simulator on the right or click "New Request" to create one.</div>
+        <div style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
+          <div style="font-size: 2rem; margin-bottom: 6px;">📭</div>
+          <div style="font-weight: 600; color: var(--text-secondary);">No procurement requests</div>
+          <div style="font-size: 0.78rem; margin-top: 4px;">Use the AI Agent on the right or click "+ New Request" to create one.</div>
         </div>
       `;
       return;
@@ -205,48 +183,48 @@ document.addEventListener('DOMContentLoaded', () => {
       const isPending = ticket.status === 'Approval Pending';
 
       const specsHtml = (ticket.specifications || []).slice(0, 3).map(s => 
-        `<span class="spec-pill">${escapeHtml(s)}</span>`
+        `<span class="tag-pill">${escapeHtml(s)}</span>`
       ).join('');
 
       return `
-        <div class="procurement-card" data-id="${ticket.id}">
-          <div class="card-top">
+        <div class="ticket-item" data-id="${ticket.id}">
+          <div class="ticket-top-meta">
             <div style="display: flex; align-items: center; gap: 8px;">
-              <span class="ticket-id-badge">${ticket.id}</span>
-              <span class="channel-tag ${ticket.channel}">${getChannelIcon(ticket.channel)}</span>
+              <span class="ticket-code">${ticket.id}</span>
+              <span class="tag-pill" style="text-transform: capitalize;">${ticket.channel}</span>
             </div>
-            <span class="status-badge ${statusClass}">
+            <span class="status-chip ${statusClass}">
               ● ${ticket.status}
             </span>
           </div>
 
-          <div class="card-title">${escapeHtml(ticket.title || `${ticket.quantity}x ${ticket.product}`)}</div>
+          <div class="ticket-heading">${escapeHtml(ticket.title || `${ticket.quantity}x ${ticket.product}`)}</div>
           
-          <div class="specs-pills">
-            <span class="spec-pill" style="color: var(--primary-light);">📦 ${ticket.quantity} Units</span>
-            <span class="spec-pill">⏱️ ${ticket.delivery_days} Days</span>
+          <div class="ticket-tags">
+            <span class="tag-pill" style="color: var(--primary-light);">📦 ${ticket.quantity} Units</span>
+            <span class="tag-pill">⏱️ ${ticket.delivery_days} Days</span>
             ${specsHtml}
           </div>
 
-          <div class="offer-box">
-            <div class="vendor-info">
-              <span class="vendor-label">Recommended Vendor</span>
-              <span class="vendor-name">
-                🏢 ${escapeHtml(ticket.recommended_vendor || 'Searching bids...')}
-              </span>
+          <div class="quote-highlight-box">
+            <div>
+              <div style="font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase;">Recommended Supplier</div>
+              <div style="font-size: 0.88rem; font-weight: 700; color: var(--text-main); margin-top: 1px;">
+                🏢 ${escapeHtml(ticket.recommended_vendor || 'Vendor Bids Pending')}
+              </div>
             </div>
-            <div class="price-details">
-              <div class="quoted-price">${formatINR(ticket.recommended_price || ticket.budget)}</div>
-              <div class="budget-strike">Budget: ${formatINR(ticket.budget)}</div>
+            <div style="text-align: right;">
+              <div class="highlight-price">${formatINR(ticket.recommended_price || ticket.budget)}</div>
+              <div style="font-size: 0.72rem; color: var(--text-muted);">Budget: ${formatINR(ticket.budget)}</div>
             </div>
           </div>
 
-          <div class="card-footer">
-            <div class="requester-meta">
-              👤 ${escapeHtml(ticket.requester_name || 'Requester')}
-            </div>
+          <div class="ticket-action-bar">
+            <span style="font-size: 0.75rem; color: var(--text-muted);">
+              👤 ${escapeHtml(ticket.requester_name || 'Employee')}
+            </span>
 
-            <div class="card-actions">
+            <div style="display: flex; gap: 6px;">
               <button class="btn btn-glass btn-sm btn-view-details" data-id="${ticket.id}">
                 Details
               </button>
@@ -279,53 +257,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ---------------------------------------------------------
-  // Vendor Directory Rendering
-  // ---------------------------------------------------------
-  function renderVendorDirectory(vendors) {
-    if (!vendors || vendors.length === 0) {
-      vendorDirectoryContainer.innerHTML = `<div style="color: var(--text-muted); text-align: center; padding: 20px;">No vendors found in catalog.</div>`;
-      return;
-    }
-
-    vendorDirectoryContainer.innerHTML = vendors.map(v => {
-      const catsHtml = (v.product_categories || []).map(c => `<span class="spec-pill">${escapeHtml(c)}</span>`).join('');
-      const certsHtml = (v.certifications || []).map(cert => `<span class="cert-pill">✓ ${escapeHtml(cert)}</span>`).join('');
-
-      return `
-        <div class="vendor-card-item">
-          <div class="vendor-header-line">
-            <div style="font-weight: 700; color: var(--text-main); font-size: 0.95rem;">${escapeHtml(v.name)}</div>
-            <div class="vendor-rating-pill">⭐ ${v.rating} / 5.0</div>
-          </div>
-          <div style="font-size: 0.76rem; color: var(--text-muted);">
-            📧 ${escapeHtml(v.contact_email)} • 🏆 ${escapeHtml(v.market_tier)}
-          </div>
-          <div style="font-size: 0.74rem; color: #34d399;">
-            🚚 ${escapeHtml(v.past_performance)}
-          </div>
-          <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px;">
-            ${catsHtml}
-          </div>
-          <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px;">
-            ${certsHtml || '<span style="font-size: 0.68rem; color: #fb7185;">⚠️ No verified OEM certifications</span>'}
-          </div>
-        </div>
-      `;
-    }).join('');
-  }
-
-  // Filter vendor catalog
-  viVendorSearch.addEventListener('input', (e) => {
-    const q = e.target.value.toLowerCase().trim();
-    const filtered = state.vendors.filter(v => 
-      v.name.toLowerCase().includes(q) || 
-      (v.product_categories || []).some(c => c.toLowerCase().includes(q))
-    );
-    renderVendorDirectory(filtered);
-  });
-
-  // ---------------------------------------------------------
-  // Sample Quotation Analysis & 4-Factor Scoring Execution
+  // Sample Quotation Analysis & 4-Factor Scoring
   // ---------------------------------------------------------
   btnRunSampleAnalysis.addEventListener('click', async () => {
     const samplePayload = {
@@ -340,7 +272,6 @@ document.addEventListener('DOMContentLoaded', () => {
           warranty_years: 3,
           vendor_rating: 4.8,
           reliability_score: 96.0,
-          notes: "3-Yr ProSupport Next Business Day"
         },
         {
           vendor_name: "HP Commercial Direct",
@@ -349,7 +280,6 @@ document.addEventListener('DOMContentLoaded', () => {
           warranty_years: 3,
           vendor_rating: 4.6,
           reliability_score: 92.0,
-          notes: "HP CarePack 3-Yr Onsite"
         },
         {
           vendor_name: "Lenovo Premier Solutions",
@@ -358,7 +288,6 @@ document.addEventListener('DOMContentLoaded', () => {
           warranty_years: 3,
           vendor_rating: 4.5,
           reliability_score: 90.0,
-          notes: "Premier Support 3-Yr"
         },
         {
           vendor_name: "TechNova Global Ltd (Risk Outlier)",
@@ -367,12 +296,11 @@ document.addEventListener('DOMContentLoaded', () => {
           warranty_years: 1,
           vendor_rating: 3.6,
           reliability_score: 72.0,
-          notes: "Unverified third-party warranty"
         }
       ]
     };
 
-    scoringMatrixContainer.innerHTML = `<div style="text-align: center; padding: 20px; color: var(--primary-light);">Evaluating 4-Factor Weighted Model (40% Price, 25% Delivery, 20% Reliability, 15% Warranty)...</div>`;
+    scoringMatrixContainer.innerHTML = `<div style="text-align: center; padding: 20px; color: var(--primary-light);">Computing 4-Factor Weighted Model (40% Price, 25% Delivery, 20% Reliability, 15% Warranty)...</div>`;
 
     try {
       const res = await fetch('/quotes/analyze', {
@@ -384,68 +312,66 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!res.ok) return;
       const data = await res.json();
 
-      // Render 4-Factor Scoring Results
+      // Render 4-Factor Scoring Cards
       scoringMatrixContainer.innerHTML = data.scoring_results.map(s => `
-        <div class="score-card" style="${s.is_recommended ? 'border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.05);' : ''}">
-          <div class="score-header">
+        <div class="score-item-card" style="${s.is_recommended ? 'border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.05);' : ''}">
+          <div class="score-top">
             <div>
-              <span style="font-weight: 700; font-size: 1rem; color: var(--text-main);">
+              <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-main);">
                 #${s.rank} ${escapeHtml(s.vendor)}
-              </span>
-              ${s.is_recommended ? '<span style="background: rgba(16, 185, 129, 0.2); color: #34d399; font-size: 0.7rem; padding: 2px 7px; border-radius: 4px; margin-left: 8px; font-weight: bold;">Top Pick</span>' : ''}
-              <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 2px;">
-                Quoted: <b style="color: #34d399;">${formatINR(s.quoted_price)}</b> • ${s.delivery_days} Days Delivery • ${s.warranty_years}-Year Warranty
+              </div>
+              <div style="font-size: 0.74rem; color: var(--text-secondary); margin-top: 1px;">
+                Quoted: <b style="color: #34d399;">${formatINR(s.quoted_price)}</b> • ${s.delivery_days} Days • ${s.warranty_years}-Yr Warranty
               </div>
             </div>
-            <div class="score-badge-large">${s.score}<span style="font-size: 0.75rem; color: var(--text-muted);">/100</span></div>
+            <div class="score-large">${s.score}<span style="font-size: 0.72rem; color: var(--text-muted);">/100</span></div>
           </div>
 
-          <div class="score-breakdown-row">
-            <div class="score-sub-box">
-              <div class="score-sub-label">Price (40%)</div>
-              <div class="score-sub-val">${s.price_score}</div>
+          <div class="score-grid-4">
+            <div class="sub-score-box">
+              <div class="sub-score-label">Price (40%)</div>
+              <div class="sub-score-value">${s.price_score}</div>
             </div>
-            <div class="score-sub-box">
-              <div class="score-sub-label">Delivery (25%)</div>
-              <div class="score-sub-val">${s.delivery_score}</div>
+            <div class="sub-score-box">
+              <div class="sub-score-label">Delivery (25%)</div>
+              <div class="sub-score-value">${s.delivery_score}</div>
             </div>
-            <div class="score-sub-box">
-              <div class="score-sub-label">Reliability (20%)</div>
-              <div class="score-sub-val">${s.reliability_score}</div>
+            <div class="sub-score-box">
+              <div class="sub-score-label">Reliability (20%)</div>
+              <div class="sub-score-value">${s.reliability_score}</div>
             </div>
-            <div class="score-sub-box">
-              <div class="score-sub-label">Warranty (15%)</div>
-              <div class="score-sub-val">${s.warranty_score}</div>
+            <div class="sub-score-box">
+              <div class="sub-score-label">Warranty (15%)</div>
+              <div class="sub-score-value">${s.warranty_score}</div>
             </div>
           </div>
         </div>
       `).join('');
 
-      // Render Risk Radar Alerts
+      // Render Risk Alerts
       riskCountBadge.textContent = `${data.risk_alerts.length} Alert${data.risk_alerts.length === 1 ? '' : 's'}`;
       if (data.risk_alerts.length > 0) {
         riskRadarContainer.innerHTML = data.risk_alerts.map(alert => `
-          <div class="risk-alert-item risk-${alert.risk_level.toLowerCase()}">
-            <div style="display: flex; justify-content: space-between; font-weight: 700; margin-bottom: 4px;">
+          <div class="risk-card risk-${alert.risk_level.toLowerCase()}">
+            <div style="display: flex; justify-content: space-between; font-weight: 700;">
               <span>⚠️ ${escapeHtml(alert.vendor_name)}</span>
               <span>Level: ${alert.risk_level}</span>
             </div>
-            <div style="font-weight: 600;">${escapeHtml(alert.risk_factor)}</div>
-            <div style="font-size: 0.76rem; margin-top: 3px;">${escapeHtml(alert.reason)}</div>
-            <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 4px;">💡 <b>Advice:</b> ${escapeHtml(alert.mitigation_advice || 'None')}</div>
+            <div style="font-weight: 600; margin-top: 2px;">${escapeHtml(alert.risk_factor)}</div>
+            <div style="font-size: 0.75rem; margin-top: 2px;">${escapeHtml(alert.reason)}</div>
           </div>
         `).join('');
       } else {
-        riskRadarContainer.innerHTML = `<div style="text-align: center; color: #34d399; padding: 20px;">✓ All supplier quotes cleared risk parameters.</div>`;
+        riskRadarContainer.innerHTML = `<div style="text-align: center; color: #34d399; padding: 14px;">✓ All quotes passed compliance checks.</div>`;
       }
 
     } catch (err) {
-      console.error('Error analyzing sample quotes:', err);
+      console.error('Error analyzing quotes:', err);
     }
   });
 
   // ---------------------------------------------------------
-  // Autonomous Negotiation Trigger
+  // Negotiation Action Trigger
   // ---------------------------------------------------------
   btnTriggerNegotiationDemo.addEventListener('click', async () => {
     try {
@@ -470,37 +396,29 @@ document.addEventListener('DOMContentLoaded', () => {
         await fetchStats();
       }
     } catch (err) {
-      console.error('Error triggering negotiation:', err);
+      console.error('Error launching negotiation:', err);
     }
   });
 
   function renderNegotiations(threads) {
     if (!threads || threads.length === 0) {
-      negotiationsContainer.innerHTML = `<div style="color: var(--text-muted); text-align: center; padding: 20px;">No active negotiation rounds. Click "Launch AI Negotiation" above.</div>`;
+      negotiationsContainer.innerHTML = `<div style="color: var(--text-muted); text-align: center; padding: 14px; font-size: 0.8rem;">No active negotiation rounds.</div>`;
       return;
     }
 
     negotiationsContainer.innerHTML = threads.map(t => `
-      <div class="negotiation-card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-          <div style="font-weight: 700; color: var(--text-main); font-size: 0.92rem;">
+      <div style="background: rgba(12, 17, 28, 0.5); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px 14px; margin-bottom: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div style="font-weight: 700; color: var(--text-main); font-size: 0.86rem;">
             🤝 ${escapeHtml(t.vendor_name)}
           </div>
-          <span class="neg-status-pill improved-offer">
-            ● ${t.status} (+${formatINR(t.savings_achieved)} Saved)
+          <span style="background: rgba(16, 185, 129, 0.15); color: #34d399; font-size: 0.7rem; font-weight: 700; padding: 2px 7px; border-radius: 9999px;">
+            +${formatINR(t.savings_achieved)} Concession
           </span>
         </div>
-
-        <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 8px;">
-          Initial Bid: <strike>${formatINR(t.initial_price)}</strike> ➔ Improved Concession: <b style="color: #34d399;">${formatINR(t.current_price)}</b>
+        <div style="font-size: 0.74rem; color: var(--text-secondary); margin-top: 4px;">
+          Initial: <strike>${formatINR(t.initial_price)}</strike> ➔ Improved: <b style="color: #34d399;">${formatINR(t.current_price)}</b>
         </div>
-
-        <details style="background: rgba(0,0,0,0.3); padding: 8px 12px; border-radius: 6px; font-size: 0.75rem; color: var(--text-muted);">
-          <summary style="cursor: pointer; color: var(--primary-light); font-weight: 600;">View Negotiation Email Transcript</summary>
-          <div style="margin-top: 8px; white-space: pre-wrap; font-family: var(--font-mono); color: #cbd5e1; font-size: 0.72rem;">${escapeHtml(t.counter_offer_text)}</div>
-          <hr style="border: 0; border-top: 1px solid var(--border-glass); margin: 8px 0;">
-          <div style="white-space: pre-wrap; font-family: var(--font-mono); color: #34d399; font-size: 0.72rem;">${escapeHtml(t.vendor_reply_text || '')}</div>
-        </details>
       </div>
     `).join('');
   }
@@ -513,7 +431,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const res = await fetch('/reports/comparison');
       if (!res.ok) return;
       const md = await res.text();
-      document.getElementById('report-modal-title').textContent = 'Vendor Comparison Report (Markdown)';
+      document.getElementById('report-modal-title').textContent = 'Vendor Comparison Report';
       document.getElementById('report-modal-body').textContent = md;
       reportModal.classList.add('open');
     } catch (err) {
@@ -526,7 +444,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const res = await fetch('/reports/negotiation');
       if (!res.ok) return;
       const md = await res.text();
-      document.getElementById('report-modal-title').textContent = 'Autonomous Negotiation Activity Report';
+      document.getElementById('report-modal-title').textContent = 'Negotiation Intelligence Report';
       document.getElementById('report-modal-body').textContent = md;
       reportModal.classList.add('open');
     } catch (err) {
@@ -543,62 +461,37 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!res.ok) return;
       const ticket = await res.json();
 
-      const auditRes = await fetch(`/api/audit-logs/${ticketId}`);
-      const auditLogs = auditRes.ok ? await auditRes.json() : [];
-
       document.getElementById('modal-ticket-id').textContent = ticket.id;
       document.getElementById('modal-ticket-title').textContent = ticket.title;
 
       const quotesHtml = (ticket.quotes || []).map(q => `
-        <tr class="${q.is_recommended ? 'recommended' : ''}">
-          <td style="font-weight: 600;">
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+          <td style="padding: 8px 10px; font-weight: 600;">
             ${q.is_recommended ? '⭐ ' : ''}${escapeHtml(q.vendor_name)}
-            ${q.is_recommended ? '<span style="font-size: 0.68rem; color: #34d399; display: block;">Top Recommendation</span>' : ''}
           </td>
-          <td style="color: #34d399; font-weight: 700;">${formatINR(q.price)}</td>
-          <td>${q.delivery_days} Days</td>
-          <td>⭐ ${q.rating} / 5.0</td>
-          <td style="color: #34d399;">${q.savings_percentage > 0 ? `+${q.savings_percentage}%` : 'Standard'}</td>
+          <td style="padding: 8px 10px; color: #34d399; font-weight: 700;">${formatINR(q.price)}</td>
+          <td style="padding: 8px 10px;">${q.delivery_days} Days</td>
+          <td style="padding: 8px 10px;">${q.warranty_years} Yrs</td>
+          <td style="padding: 8px 10px; color: #34d399;">${q.savings_percentage > 0 ? `+${q.savings_percentage}%` : 'Standard'}</td>
         </tr>
       `).join('');
 
-      const timelineHtml = (auditLogs || []).map(log => `
-        <div class="timeline-item">
-          <div class="timeline-dot"></div>
-          <div class="timeline-title">${escapeHtml(log.action)} (${escapeHtml(log.stage)})</div>
-          <div class="timeline-meta">By ${escapeHtml(log.actor)} • ${new Date(log.timestamp).toLocaleTimeString()}</div>
-        </div>
-      `).join('');
-
-      const structuredJsonString = JSON.stringify({
-        product: ticket.product,
-        quantity: ticket.quantity,
-        budget: ticket.budget,
-        delivery_days: ticket.delivery_days,
-        specifications: ticket.specifications
-      }, null, 2);
-
       const content = document.getElementById('modal-ticket-content');
       content.innerHTML = `
-        <div style="display: flex; gap: 8px; margin-bottom: 16px;">
-          <span class="status-badge ${getStatusClass(ticket.status)}">● ${ticket.status}</span>
-          <span class="channel-tag ${ticket.channel}">${getChannelIcon(ticket.channel)}</span>
+        <div style="background: rgba(0,0,0,0.3); padding: 14px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle); margin-bottom: 16px;">
+          <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Executive Summary</div>
+          <div style="font-size: 0.85rem; margin-top: 2px; color: var(--text-main);">${escapeHtml(ticket.summary || 'Summary unavailable')}</div>
         </div>
 
-        <div style="background: rgba(0,0,0,0.3); padding: 14px; border-radius: var(--radius-md); border: 1px solid var(--border-glass); margin-bottom: 18px;">
-          <div style="font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase;">Executive Summary</div>
-          <div style="font-size: 0.85rem; margin-top: 4px; color: var(--text-main);">${escapeHtml(ticket.summary || 'Summary unavailable')}</div>
-        </div>
-
-        <h4 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 8px;">Vendor Bids & Quotation Matrix</h4>
-        <table class="quote-table">
+        <div style="font-weight: 700; font-size: 0.9rem; margin-bottom: 8px;">Vendor Bids Comparison</div>
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-bottom: 16px;">
           <thead>
-            <tr>
-              <th>Vendor</th>
-              <th>Quoted Price</th>
-              <th>Timeline</th>
-              <th>Rating</th>
-              <th>Savings</th>
+            <tr style="color: var(--text-muted); border-bottom: 1px solid var(--border-subtle); text-align: left;">
+              <th style="padding: 6px 10px;">Vendor</th>
+              <th style="padding: 6px 10px;">Quoted Price</th>
+              <th style="padding: 6px 10px;">Timeline</th>
+              <th style="padding: 6px 10px;">Warranty</th>
+              <th style="padding: 6px 10px;">Savings</th>
             </tr>
           </thead>
           <tbody>
@@ -606,21 +499,13 @@ document.addEventListener('DOMContentLoaded', () => {
           </tbody>
         </table>
 
-        <h4 style="font-size: 0.95rem; font-weight: 700; margin: 18px 0 8px 0;">Structured JSON Payload</h4>
-        <pre style="background: #060911; border: 1px solid var(--border-glass); padding: 12px; border-radius: 8px; font-family: var(--font-mono); font-size: 0.76rem; color: #38bdf8; overflow-x: auto;">${structuredJsonString}</pre>
-
-        <h4 style="font-size: 0.95rem; font-weight: 700; margin: 18px 0 8px 0;">Workflow Audit Trail</h4>
-        <div class="timeline">
-          ${timelineHtml || '<div class="timeline-meta">No audit logs yet.</div>'}
-        </div>
-
         ${ticket.status === 'Approval Pending' ? `
-          <div style="display: flex; gap: 12px; margin-top: 20px; border-top: 1px solid var(--border-glass); padding-top: 16px;">
-            <button class="btn btn-success" style="flex: 1;" id="modal-btn-approve">
-              ✓ Authorize & Approve (${formatINR(ticket.recommended_price)})
+          <div style="display: flex; gap: 10px; margin-top: 18px; border-top: 1px solid var(--border-subtle); padding-top: 16px;">
+            <button class="btn btn-success btn-sm" style="flex: 1;" id="modal-btn-approve">
+              ✓ Approve (${formatINR(ticket.recommended_price)})
             </button>
-            <button class="btn btn-danger" style="flex: 1;" id="modal-btn-reject">
-              ✕ Reject Request
+            <button class="btn btn-danger btn-sm" style="flex: 1;" id="modal-btn-reject">
+              ✕ Reject
             </button>
           </div>
         ` : ''}
@@ -652,7 +537,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ approver: 'Dashboard Manager', channel: 'web' })
+        body: JSON.stringify({ approver: 'Manager', channel: 'web' })
       });
       if (res.ok) {
         await loadDashboardData();
@@ -677,12 +562,12 @@ document.addEventListener('DOMContentLoaded', () => {
     state.activeSimChannel = 'email';
     simTabEmail.classList.add('active', 'email');
     simTabTelegram.classList.remove('active', 'telegram');
-    chatInput.placeholder = "Type Email body (e.g. 'Procure 50 server racks...')...";
+    chatInput.placeholder = "Type Email message...";
   });
 
-  quickPromptBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      chatInput.value = btn.dataset.text;
+  quickChips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      chatInput.value = chip.dataset.text;
       chatInput.focus();
     });
   });
@@ -695,8 +580,6 @@ document.addEventListener('DOMContentLoaded', () => {
     chatInput.value = '';
     appendChatBubble('user', text);
 
-    const typingBubble = appendTypingIndicator();
-
     try {
       const res = await fetch('/api/channels/simulate-message', {
         method: 'POST',
@@ -706,11 +589,8 @@ document.addEventListener('DOMContentLoaded', () => {
           sender_id: state.simSenderId,
           sender_name: state.simSenderName,
           text: text,
-          subject: state.activeSimChannel === 'email' ? 'Procurement Request Inquiry' : null
         })
       });
-
-      typingBubble.remove();
 
       if (res.ok) {
         const data = await res.json();
@@ -720,13 +600,12 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (data.status === 'ticket_created') {
           const t = data.ticket;
           const msg = `
-            🎉 <b>Procurement Ticket Created: <span style="color: var(--primary-light);">${t.id}</span></b><br><br>
+            🎉 <b>Procurement Created: <span style="color: var(--primary-light);">${t.id}</span></b><br>
             📦 <b>Item:</b> ${t.quantity}x ${t.product}<br>
             💰 <b>Budget:</b> ${formatINR(t.budget)}<br>
-            🚚 <b>Delivery:</b> ${t.delivery_days} Days<br>
-            🏢 <b>Recommended Vendor:</b> ${t.recommended_vendor} (${formatINR(t.recommended_price)})<br><br>
+            🏢 <b>Recommended:</b> ${t.recommended_vendor} (${formatINR(t.recommended_price)})<br><br>
             <i>Approve or Reject?</i>
-            <div style="display: flex; gap: 8px; margin-top: 10px;">
+            <div style="display: flex; gap: 8px; margin-top: 8px;">
               <button class="btn btn-success btn-sm btn-sim-approve" data-id="${t.id}">Approve</button>
               <button class="btn btn-danger btn-sm btn-sim-reject" data-id="${t.id}">Reject</button>
             </div>
@@ -757,41 +636,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
     } catch (err) {
-      typingBubble.remove();
-      appendChatBubble('agent', '⚠️ Error communicating with agent server.');
+      appendChatBubble('agent', '⚠️ Error connecting to server.');
       console.error('Simulator error:', err);
     }
   });
 
   function appendChatBubble(sender, text, isHtml = false) {
     const bubble = document.createElement('div');
-    bubble.className = `chat-bubble ${sender}`;
-
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const tag = sender === 'agent' ? `<div class="agent-tag">🤖 Caspian Agent (${state.activeSimChannel.toUpperCase()})</div>` : '';
+    bubble.className = `chat-msg ${sender}`;
+    const tag = sender === 'agent' ? `<div style="font-size: 0.7rem; font-weight: 700; color: var(--primary-light); margin-bottom: 2px;">🤖 Caspian (${state.activeSimChannel.toUpperCase()})</div>` : '';
 
     bubble.innerHTML = `
       ${tag}
       <div>${isHtml ? text : escapeHtml(text).replace(/\n/g, '<br>')}</div>
-      <div class="bubble-time">${timeStr}</div>
     `;
 
-    chatStream.appendChild(bubble);
-    chatStream.scrollTop = chatStream.scrollHeight;
-    return bubble;
-  }
-
-  function appendTypingIndicator() {
-    const bubble = document.createElement('div');
-    bubble.className = 'chat-bubble agent';
-    bubble.innerHTML = `
-      <div class="agent-tag">🤖 Caspian Agent thinking...</div>
-      <div style="display: flex; gap: 4px; padding: 4px 0;">
-        <span style="animation: pulse 1s infinite;">●</span>
-        <span style="animation: pulse 1s infinite 0.2s;">●</span>
-        <span style="animation: pulse 1s infinite 0.4s;">●</span>
-      </div>
-    `;
     chatStream.appendChild(bubble);
     chatStream.scrollTop = chatStream.scrollHeight;
     return bubble;
@@ -800,11 +659,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // ---------------------------------------------------------
   // Filter & Search Controls
   // ---------------------------------------------------------
-  filterTabs.querySelectorAll('.filter-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      filterTabs.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-      state.activeStatusFilter = tab.dataset.status;
+  filterTabs.querySelectorAll('.filter-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      filterTabs.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      state.activeStatusFilter = pill.dataset.status;
       fetchProcurements();
     });
   });
@@ -816,13 +675,6 @@ document.addEventListener('DOMContentLoaded', () => {
       state.searchQuery = e.target.value.trim();
       fetchProcurements();
     }, 250);
-  });
-
-  btnRefresh.addEventListener('click', () => {
-    loadDashboardData();
-    if (tabNavVi.classList.contains('active')) {
-      loadVendorIntelligenceData();
-    }
   });
 
   // ---------------------------------------------------------
@@ -842,7 +694,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const delivery_days = parseInt(document.getElementById('create-delivery').value);
     const channel = document.getElementById('create-channel').value;
     const specsRaw = document.getElementById('create-specs').value;
-    const requester_name = document.getElementById('create-requester').value || 'Employee';
 
     const specifications = specsRaw ? specsRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
 
@@ -857,7 +708,6 @@ document.addEventListener('DOMContentLoaded', () => {
           delivery_days,
           channel,
           specifications,
-          requester_name,
         })
       });
 
