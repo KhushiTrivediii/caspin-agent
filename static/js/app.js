@@ -1,12 +1,14 @@
 /**
- * Enterprise AI Procurement Agent - Frontend Application Logic
- * Integrates with Caspian SDK Backend API, Channel Simulator, and Real-Time Dashboard
+ * Enterprise AI Procurement Agent & Vendor Intelligence Engine
+ * Frontend Controller & API Integration
  */
 
 document.addEventListener('DOMContentLoaded', () => {
   // Application State
   const state = {
     procurements: [],
+    vendors: [],
+    negotiations: [],
     stats: null,
     activeStatusFilter: '',
     searchQuery: '',
@@ -15,11 +17,19 @@ document.addEventListener('DOMContentLoaded', () => {
     simSenderName: 'Sarah Chen (Lead)',
   };
 
-  // DOM Elements
+  // Top Nav Elements
+  const tabNavWorkflow = document.getElementById('tab-nav-workflow');
+  const tabNavVi = document.getElementById('tab-nav-vi');
+  const viewProcurement = document.getElementById('view-procurement');
+  const viewVendorIntelligence = document.getElementById('view-vendor-intelligence');
+
+  // KPI Elements
   const kpiTotalRequests = document.getElementById('kpi-total-requests');
   const kpiPendingApprovals = document.getElementById('kpi-pending-approvals');
   const kpiCommittedSpend = document.getElementById('kpi-committed-spend');
   const kpiTotalSavings = document.getElementById('kpi-total-savings');
+
+  // Workflow Pipeline Elements
   const cardsContainer = document.getElementById('procurement-cards-container');
   const pipelineCount = document.getElementById('pipeline-count');
   const searchInput = document.getElementById('search-input');
@@ -34,12 +44,26 @@ document.addEventListener('DOMContentLoaded', () => {
   const chatInput = document.getElementById('chat-input');
   const quickPromptBtns = document.querySelectorAll('.quick-prompt-btn');
 
+  // Vendor Intelligence Elements
+  const btnRunSampleAnalysis = document.getElementById('btn-run-sample-analysis');
+  const btnTriggerNegotiationDemo = document.getElementById('btn-trigger-negotiation-demo');
+  const btnViewComparisonReport = document.getElementById('btn-view-comparison-report');
+  const btnViewNegotiationReport = document.getElementById('btn-view-negotiation-report');
+  const scoringMatrixContainer = document.getElementById('scoring-matrix-container');
+  const riskRadarContainer = document.getElementById('risk-radar-container');
+  const riskCountBadge = document.getElementById('risk-count-badge');
+  const vendorDirectoryContainer = document.getElementById('vendor-directory-container');
+  const negotiationsContainer = document.getElementById('negotiations-container');
+  const viVendorSearch = document.getElementById('vi-vendor-search');
+
   // Modals Elements
   const ticketModal = document.getElementById('ticket-modal');
   const createModal = document.getElementById('create-modal');
+  const reportModal = document.getElementById('report-modal');
   const btnOpenCreateModal = document.getElementById('btn-open-create-modal');
   const btnCloseTicketModal = document.getElementById('btn-close-ticket-modal');
   const btnCloseCreateModal = document.getElementById('btn-close-create-modal');
+  const btnCloseReportModal = document.getElementById('btn-close-report-modal');
   const btnCancelCreate = document.getElementById('btn-cancel-create');
   const formCreateProcurement = document.getElementById('form-create-procurement');
 
@@ -54,8 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function getStatusClass(status) {
-    const s = (status || '').toLowerCase().replace(/\s+/g, '-');
-    return s;
+    return (status || '').toLowerCase().replace(/\s+/g, '-');
   }
 
   function getChannelIcon(channel) {
@@ -65,7 +88,25 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ---------------------------------------------------------
-  // API Fetch Functions
+  // View Navigation
+  // ---------------------------------------------------------
+  tabNavWorkflow.addEventListener('click', () => {
+    tabNavWorkflow.classList.add('active');
+    tabNavVi.classList.remove('active');
+    viewProcurement.classList.add('active-view');
+    viewVendorIntelligence.classList.remove('active-view');
+  });
+
+  tabNavVi.addEventListener('click', () => {
+    tabNavVi.classList.add('active');
+    tabNavWorkflow.classList.remove('active');
+    viewVendorIntelligence.classList.add('active-view');
+    viewProcurement.classList.remove('active-view');
+    loadVendorIntelligenceData();
+  });
+
+  // ---------------------------------------------------------
+  // Data Loaders
   // ---------------------------------------------------------
   async function loadDashboardData() {
     await Promise.all([fetchStats(), fetchProcurements()]);
@@ -103,6 +144,34 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  async function loadVendorIntelligenceData() {
+    await Promise.all([fetchVendors(), fetchNegotiations()]);
+  }
+
+  async function fetchVendors() {
+    try {
+      const res = await fetch('/vendors');
+      if (!res.ok) return;
+      const data = await res.json();
+      state.vendors = data;
+      renderVendorDirectory(data);
+    } catch (err) {
+      console.error('Error fetching vendors:', err);
+    }
+  }
+
+  async function fetchNegotiations() {
+    try {
+      const res = await fetch('/negotiations');
+      if (!res.ok) return;
+      const data = await res.json();
+      state.negotiations = data;
+      renderNegotiations(data);
+    } catch (err) {
+      console.error('Error fetching negotiations:', err);
+    }
+  }
+
   // ---------------------------------------------------------
   // Render KPI Metrics
   // ---------------------------------------------------------
@@ -134,7 +203,6 @@ document.addEventListener('DOMContentLoaded', () => {
     cardsContainer.innerHTML = tickets.map(ticket => {
       const statusClass = getStatusClass(ticket.status);
       const isPending = ticket.status === 'Approval Pending';
-      const isApproved = ticket.status === 'Approved' || ticket.status === 'Completed';
 
       const specsHtml = (ticket.specifications || []).slice(0, 3).map(s => 
         `<span class="spec-pill">${escapeHtml(s)}</span>`
@@ -196,7 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
       `;
     }).join('');
 
-    // Attach button event listeners
+    // Attach listeners
     document.querySelectorAll('.btn-view-details').forEach(btn => {
       btn.addEventListener('click', () => openTicketModal(btn.dataset.id));
     });
@@ -211,6 +279,262 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ---------------------------------------------------------
+  // Vendor Directory Rendering
+  // ---------------------------------------------------------
+  function renderVendorDirectory(vendors) {
+    if (!vendors || vendors.length === 0) {
+      vendorDirectoryContainer.innerHTML = `<div style="color: var(--text-muted); text-align: center; padding: 20px;">No vendors found in catalog.</div>`;
+      return;
+    }
+
+    vendorDirectoryContainer.innerHTML = vendors.map(v => {
+      const catsHtml = (v.product_categories || []).map(c => `<span class="spec-pill">${escapeHtml(c)}</span>`).join('');
+      const certsHtml = (v.certifications || []).map(cert => `<span class="cert-pill">✓ ${escapeHtml(cert)}</span>`).join('');
+
+      return `
+        <div class="vendor-card-item">
+          <div class="vendor-header-line">
+            <div style="font-weight: 700; color: var(--text-main); font-size: 0.95rem;">${escapeHtml(v.name)}</div>
+            <div class="vendor-rating-pill">⭐ ${v.rating} / 5.0</div>
+          </div>
+          <div style="font-size: 0.76rem; color: var(--text-muted);">
+            📧 ${escapeHtml(v.contact_email)} • 🏆 ${escapeHtml(v.market_tier)}
+          </div>
+          <div style="font-size: 0.74rem; color: #34d399;">
+            🚚 ${escapeHtml(v.past_performance)}
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px;">
+            ${catsHtml}
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px;">
+            ${certsHtml || '<span style="font-size: 0.68rem; color: #fb7185;">⚠️ No verified OEM certifications</span>'}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // Filter vendor catalog
+  viVendorSearch.addEventListener('input', (e) => {
+    const q = e.target.value.toLowerCase().trim();
+    const filtered = state.vendors.filter(v => 
+      v.name.toLowerCase().includes(q) || 
+      (v.product_categories || []).some(c => c.toLowerCase().includes(q))
+    );
+    renderVendorDirectory(filtered);
+  });
+
+  // ---------------------------------------------------------
+  // Sample Quotation Analysis & 4-Factor Scoring Execution
+  // ---------------------------------------------------------
+  btnRunSampleAnalysis.addEventListener('click', async () => {
+    const samplePayload = {
+      product: "Laptop",
+      quantity: 100,
+      budget: 4500000.0,
+      quotes: [
+        {
+          vendor_name: "Dell Partner (Enterprise Solutions)",
+          price: 4150000.0,
+          delivery_days: 7,
+          warranty_years: 3,
+          vendor_rating: 4.8,
+          reliability_score: 96.0,
+          notes: "3-Yr ProSupport Next Business Day"
+        },
+        {
+          vendor_name: "HP Commercial Direct",
+          price: 4320000.0,
+          delivery_days: 9,
+          warranty_years: 3,
+          vendor_rating: 4.6,
+          reliability_score: 92.0,
+          notes: "HP CarePack 3-Yr Onsite"
+        },
+        {
+          vendor_name: "Lenovo Premier Solutions",
+          price: 4400000.0,
+          delivery_days: 8,
+          warranty_years: 3,
+          vendor_rating: 4.5,
+          reliability_score: 90.0,
+          notes: "Premier Support 3-Yr"
+        },
+        {
+          vendor_name: "TechNova Global Ltd (Risk Outlier)",
+          price: 2800000.0,
+          delivery_days: 16,
+          warranty_years: 1,
+          vendor_rating: 3.6,
+          reliability_score: 72.0,
+          notes: "Unverified third-party warranty"
+        }
+      ]
+    };
+
+    scoringMatrixContainer.innerHTML = `<div style="text-align: center; padding: 20px; color: var(--primary-light);">Evaluating 4-Factor Weighted Model (40% Price, 25% Delivery, 20% Reliability, 15% Warranty)...</div>`;
+
+    try {
+      const res = await fetch('/quotes/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(samplePayload)
+      });
+
+      if (!res.ok) return;
+      const data = await res.json();
+
+      // Render 4-Factor Scoring Results
+      scoringMatrixContainer.innerHTML = data.scoring_results.map(s => `
+        <div class="score-card" style="${s.is_recommended ? 'border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.05);' : ''}">
+          <div class="score-header">
+            <div>
+              <span style="font-weight: 700; font-size: 1rem; color: var(--text-main);">
+                #${s.rank} ${escapeHtml(s.vendor)}
+              </span>
+              ${s.is_recommended ? '<span style="background: rgba(16, 185, 129, 0.2); color: #34d399; font-size: 0.7rem; padding: 2px 7px; border-radius: 4px; margin-left: 8px; font-weight: bold;">Top Pick</span>' : ''}
+              <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 2px;">
+                Quoted: <b style="color: #34d399;">${formatINR(s.quoted_price)}</b> • ${s.delivery_days} Days Delivery • ${s.warranty_years}-Year Warranty
+              </div>
+            </div>
+            <div class="score-badge-large">${s.score}<span style="font-size: 0.75rem; color: var(--text-muted);">/100</span></div>
+          </div>
+
+          <div class="score-breakdown-row">
+            <div class="score-sub-box">
+              <div class="score-sub-label">Price (40%)</div>
+              <div class="score-sub-val">${s.price_score}</div>
+            </div>
+            <div class="score-sub-box">
+              <div class="score-sub-label">Delivery (25%)</div>
+              <div class="score-sub-val">${s.delivery_score}</div>
+            </div>
+            <div class="score-sub-box">
+              <div class="score-sub-label">Reliability (20%)</div>
+              <div class="score-sub-val">${s.reliability_score}</div>
+            </div>
+            <div class="score-sub-box">
+              <div class="score-sub-label">Warranty (15%)</div>
+              <div class="score-sub-val">${s.warranty_score}</div>
+            </div>
+          </div>
+        </div>
+      `).join('');
+
+      // Render Risk Radar Alerts
+      riskCountBadge.textContent = `${data.risk_alerts.length} Alert${data.risk_alerts.length === 1 ? '' : 's'}`;
+      if (data.risk_alerts.length > 0) {
+        riskRadarContainer.innerHTML = data.risk_alerts.map(alert => `
+          <div class="risk-alert-item risk-${alert.risk_level.toLowerCase()}">
+            <div style="display: flex; justify-content: space-between; font-weight: 700; margin-bottom: 4px;">
+              <span>⚠️ ${escapeHtml(alert.vendor_name)}</span>
+              <span>Level: ${alert.risk_level}</span>
+            </div>
+            <div style="font-weight: 600;">${escapeHtml(alert.risk_factor)}</div>
+            <div style="font-size: 0.76rem; margin-top: 3px;">${escapeHtml(alert.reason)}</div>
+            <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 4px;">💡 <b>Advice:</b> ${escapeHtml(alert.mitigation_advice || 'None')}</div>
+          </div>
+        `).join('');
+      } else {
+        riskRadarContainer.innerHTML = `<div style="text-align: center; color: #34d399; padding: 20px;">✓ All supplier quotes cleared risk parameters.</div>`;
+      }
+
+    } catch (err) {
+      console.error('Error analyzing sample quotes:', err);
+    }
+  });
+
+  // ---------------------------------------------------------
+  // Autonomous Negotiation Trigger
+  // ---------------------------------------------------------
+  btnTriggerNegotiationDemo.addEventListener('click', async () => {
+    try {
+      const payload = {
+        procurement_id: "PROC-2026-001",
+        vendor_name: "Dell Partner (Enterprise Solutions)",
+        initial_price: 4400000.0,
+        competing_lower_price: 4200000.0,
+        target_discount_percentage: 5.5,
+        product_name: "Laptop",
+        quantity: 100
+      };
+
+      const res = await fetch('/vendors/negotiate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        await fetchNegotiations();
+        await fetchStats();
+      }
+    } catch (err) {
+      console.error('Error triggering negotiation:', err);
+    }
+  });
+
+  function renderNegotiations(threads) {
+    if (!threads || threads.length === 0) {
+      negotiationsContainer.innerHTML = `<div style="color: var(--text-muted); text-align: center; padding: 20px;">No active negotiation rounds. Click "Launch AI Negotiation" above.</div>`;
+      return;
+    }
+
+    negotiationsContainer.innerHTML = threads.map(t => `
+      <div class="negotiation-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <div style="font-weight: 700; color: var(--text-main); font-size: 0.92rem;">
+            🤝 ${escapeHtml(t.vendor_name)}
+          </div>
+          <span class="neg-status-pill improved-offer">
+            ● ${t.status} (+${formatINR(t.savings_achieved)} Saved)
+          </span>
+        </div>
+
+        <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 8px;">
+          Initial Bid: <strike>${formatINR(t.initial_price)}</strike> ➔ Improved Concession: <b style="color: #34d399;">${formatINR(t.current_price)}</b>
+        </div>
+
+        <details style="background: rgba(0,0,0,0.3); padding: 8px 12px; border-radius: 6px; font-size: 0.75rem; color: var(--text-muted);">
+          <summary style="cursor: pointer; color: var(--primary-light); font-weight: 600;">View Negotiation Email Transcript</summary>
+          <div style="margin-top: 8px; white-space: pre-wrap; font-family: var(--font-mono); color: #cbd5e1; font-size: 0.72rem;">${escapeHtml(t.counter_offer_text)}</div>
+          <hr style="border: 0; border-top: 1px solid var(--border-glass); margin: 8px 0;">
+          <div style="white-space: pre-wrap; font-family: var(--font-mono); color: #34d399; font-size: 0.72rem;">${escapeHtml(t.vendor_reply_text || '')}</div>
+        </details>
+      </div>
+    `).join('');
+  }
+
+  // ---------------------------------------------------------
+  // Executive Reports Preview
+  // ---------------------------------------------------------
+  btnViewComparisonReport.addEventListener('click', async () => {
+    try {
+      const res = await fetch('/reports/comparison');
+      if (!res.ok) return;
+      const md = await res.text();
+      document.getElementById('report-modal-title').textContent = 'Vendor Comparison Report (Markdown)';
+      document.getElementById('report-modal-body').textContent = md;
+      reportModal.classList.add('open');
+    } catch (err) {
+      console.error('Error fetching report:', err);
+    }
+  });
+
+  btnViewNegotiationReport.addEventListener('click', async () => {
+    try {
+      const res = await fetch('/reports/negotiation');
+      if (!res.ok) return;
+      const md = await res.text();
+      document.getElementById('report-modal-title').textContent = 'Autonomous Negotiation Activity Report';
+      document.getElementById('report-modal-body').textContent = md;
+      reportModal.classList.add('open');
+    } catch (err) {
+      console.error('Error fetching report:', err);
+    }
+  });
+
+  // ---------------------------------------------------------
   // Ticket Details Modal
   // ---------------------------------------------------------
   async function openTicketModal(ticketId) {
@@ -219,7 +543,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!res.ok) return;
       const ticket = await res.json();
 
-      // Fetch audit logs
       const auditRes = await fetch(`/api/audit-logs/${ticketId}`);
       const auditLogs = auditRes.ok ? await auditRes.json() : [];
 
@@ -372,7 +695,6 @@ document.addEventListener('DOMContentLoaded', () => {
     chatInput.value = '';
     appendChatBubble('user', text);
 
-    // Show temporary typing indicator
     const typingBubble = appendTypingIndicator();
 
     try {
@@ -411,7 +733,6 @@ document.addEventListener('DOMContentLoaded', () => {
           `;
           appendChatBubble('agent', msg, true);
 
-          // Attach simulated button actions
           setTimeout(() => {
             document.querySelectorAll('.btn-sim-approve').forEach(b => {
               b.onclick = () => {
@@ -499,6 +820,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   btnRefresh.addEventListener('click', () => {
     loadDashboardData();
+    if (tabNavVi.classList.contains('active')) {
+      loadVendorIntelligenceData();
+    }
   });
 
   // ---------------------------------------------------------
@@ -508,6 +832,7 @@ document.addEventListener('DOMContentLoaded', () => {
   btnCloseCreateModal.addEventListener('click', () => createModal.classList.remove('open'));
   btnCancelCreate.addEventListener('click', () => createModal.classList.remove('open'));
   btnCloseTicketModal.addEventListener('click', () => ticketModal.classList.remove('open'));
+  btnCloseReportModal.addEventListener('click', () => reportModal.classList.remove('open'));
 
   formCreateProcurement.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -550,6 +875,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('click', (e) => {
     if (e.target === ticketModal) ticketModal.classList.remove('open');
     if (e.target === createModal) createModal.classList.remove('open');
+    if (e.target === reportModal) reportModal.classList.remove('open');
   });
 
   function escapeHtml(text) {

@@ -1,21 +1,16 @@
-# ⚡ ProcureAI - Enterprise AI Procurement Agent with Caspian SDK
+# ⚡ ProcureAI - Enterprise AI Procurement & Vendor Intelligence Engine
 
-An enterprise-grade autonomous AI Procurement Agent powered by **Caspian SDK**, orchestrating seamless procurement workflows across **Telegram**, **Corporate Email**, and a real-time **Web Dashboard**.
+An enterprise-grade autonomous AI Procurement Agent & **Vendor Intelligence Engine** powered by **Caspian SDK**, orchestrating multi-channel procurement across **Telegram**, **Corporate Email**, and a real-time **Web Management Dashboard**.
 
 ---
 
-## 🌟 Core Features
+## 🌟 Core System Capabilities
 
-### 1. Multi-Channel Requirement Ingestion (Caspian SDK)
-- **Telegram Bot Integration:** Employees or managers can submit natural language procurement requests or reply directly to approval prompts.
-- **Email Gateway:** Processes inbound procurement inquiries with structured markdown/HTML responses and executive approval summaries.
-- **Interactive Channel Simulator:** Built-in live browser sandbox allowing zero-friction local testing of Telegram and Email conversations.
-
-### 2. Multi-Turn AI Requirement Extraction & Structuring
-- **Extraction Engine:** Extracts Product Name, Quantity, Budget, Delivery Timeline, and Technical Specifications.
-- **Missing Information Detection:** Automatically identifies missing mandatory requirements and formulates intelligent, contextual follow-up questions.
-  - *Example:* User asks `"Need 100 laptops."` $\rightarrow$ Agent asks `"What is your budget and required delivery timeline?"`
-- **Structured JSON Conversion:** Normalizes unstructured chats into standardized JSON payloads.
+### 1. Multi-Turn AI Requirement Collection Agent
+- Ingests natural language requests from Telegram, Email, or the Web Sandbox.
+- Extracts **Product Name, Quantity, Budget, Delivery Timeline, and Technical Specifications**.
+- Detects missing mandatory information and formulates intelligent conversational follow-up questions.
+- Converts conversational dialogue into standardized JSON payloads and creates sequential IDs: `PROC-2026-001`.
 
 ```json
 {
@@ -24,78 +19,89 @@ An enterprise-grade autonomous AI Procurement Agent powered by **Caspian SDK**, 
   "budget": 4500000,
   "delivery_days": 10,
   "specifications": [
-    "i5",
-    "16GB RAM",
-    "512GB SSD"
+    "i5 13th Gen",
+    "16GB DDR5 RAM",
+    "512GB NVMe SSD"
   ]
 }
 ```
 
-### 3. Automated Vendor Bidding & Scoring Engine
-- Generates competitive vendor quotes (e.g. Dell Partner, HP Commercial Direct, Lenovo Premier).
-- Calculates cost savings vs. initial budget and compares delivery timelines.
-- Selects the optimal vendor recommendation.
+---
 
-### 4. Interactive Approval Workflow
-- Dispatches approval requests to managers across Telegram and Email:
-```text
-Recommended Vendor: Dell Partner
-Price: ₹41.5 lakh
-Delivery: 7 Days
+### 2. Enterprise-Grade Vendor Intelligence Engine
 
-Approve or Reject?
+#### 🔍 1. Vendor Discovery Agent
+- Searches internal supplier database and external provider catalogs matching specifications and volume.
+- Tracks: `Vendor Name`, `Contact Email`, `Rating`, `Past Performance`, `Product Categories`, `Certifications`.
+
+#### 📊 2. Quotation Analysis Agent
+- Normalizes multi-vendor quotes (Price, Delivery Speed, Warranty, Vendor Rating, Reliability Index).
+- Calculates market average price and price deviation percentages.
+- Generates comprehensive comparison matrices.
+
+#### 🧮 3. 4-Factor Weighted Vendor Scoring Engine
+Calculates composite scores ($0 - 100$) using the precise weighting formula:
+$$\text{Final Score} = (0.40 \times \text{Price Score}) + (0.25 \times \text{Delivery Score}) + (0.20 \times \text{Reliability Score}) + (0.15 \times \text{Warranty Score})$$
+
+```json
+[
+  {
+    "vendor": "Dell Partner (Enterprise Solutions)",
+    "score": 99,
+    "rank": 1,
+    "is_recommended": true
+  },
+  {
+    "vendor": "HP Commercial Direct",
+    "score": 78,
+    "rank": 2,
+    "is_recommended": false
+  }
+]
 ```
-- Managers can approve/reject via Telegram buttons, email replies (`APPROVE` / `REJECT`), or the web dashboard.
 
-### 5. Procurement Ticket Lifecycle Management
-- Generates sequential unique identifiers: `PROC-2026-001`, `PROC-2026-002`, etc.
-- Tracks lifecycle stages:
-  $$\text{Open} \longrightarrow \text{Vendor Search} \longrightarrow \text{Negotiation} \longrightarrow \text{Approval Pending} \longrightarrow \text{Approved / Rejected} \longrightarrow \text{Completed}$$
+#### 🤝 4. Autonomous Negotiation Agent
+- Generates professional counter-offer emails automatically with competitive leverage.
+- Tracks lifecycle: `Sent` $\longrightarrow$ `Replied` $\longrightarrow$ `Improved Offer`.
+- Quantifies enterprise savings achieved through negotiation rounds.
+
+#### ⚠️ 5. Multi-Factor Vendor Risk Detection
+Flags:
+- **Price Anomalies / Dumping:** Alerts when bids are $\ge 25\%$ lower than market average (*e.g., "Risk Level: Medium - Price is 35% lower than market average"*).
+- **Missing Certifications:** Identifies uncertified suppliers or missing OEM Tier-1 credentials.
+- **Historical Performance Gaps:** Detects low vendor ratings ($< 3.8$) and fulfillment delays.
+- **Lead-Time Risks:** Flags delivery timelines exceeding project deadlines.
+
+#### 🏆 6. Supplier Recommendation Engine
+- Synthesizes composite scores, warranty coverage, and compliance risk flags to recommend the optimal supplier.
+
+#### 📑 7. Executive Reporting Engine
+- Generates 3 markdown/HTML downloadable reports:
+  1. **Vendor Comparison Report**
+  2. **Negotiation Intelligence Report**
+  3. **Final Recommendation Report**
 
 ---
 
-## 🏗️ Architecture
+## 📡 REST API Reference
 
-```mermaid
-flowchart TD
-    subgraph Channels ["Multi-Channel Input Layer"]
-        TG["Telegram Bot"]
-        EM["Corporate Email"]
-        SIM["Live Sandbox Simulator"]
-    end
-
-    subgraph CaspianSDK ["Caspian SDK Layer"]
-        CC["CommClient / Webhook Router"]
-        BP["Channel Behavior Prompts"]
-    end
-
-    subgraph AgentCore ["AI Procurement Core Engine"]
-        NLU["Requirement Extraction"]
-        MISS["Missing Info Detection & Follow-up"]
-        STATE["Multi-Turn Conversation Memory"]
-        VEND["Vendor Evaluation & Bidding"]
-        APP["Approval Workflow Manager"]
-    end
-
-    subgraph Storage ["Persistence Layer"]
-        DB[(SQLite / PostgreSQL Engine)]
-    end
-
-    subgraph UI ["Executive Dashboard"]
-        DASH["Glassmorphic Web App"]
-    end
-
-    TG --> CC
-    EM --> CC
-    SIM --> CC
-    CC --> BP --> NLU
-    NLU --> MISS
-    MISS -->|Incomplete| CC
-    MISS -->|Complete| STATE --> VEND
-    VEND --> APP --> CC
-    APP --> DB
-    UI <--> DB
-```
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/vendors/search` | Discover matching vendors from supplier catalog |
+| `POST` | `/quotes/analyze` | Multi-quote comparative analysis and normalization |
+| `POST` | `/vendors/score` | Compute 4-factor scores ($40\%/25\%/20\%/15\%$) |
+| `POST` | `/vendors/negotiate` | Launch AI counter-offer email & track concession |
+| `POST` | `/vendors/recommend` | Generate optimal supplier recommendation |
+| `GET` | `/vendors` | List supplier directory with certifications & ratings |
+| `GET` | `/negotiations` | Retrieve all active and completed negotiation rounds |
+| `GET` | `/reports/comparison` | Generate Vendor Comparison Markdown Report |
+| `GET` | `/reports/negotiation` | Generate Negotiation Intelligence Report |
+| `GET` | `/procurements` | List all procurement tickets (filter by status/channel) |
+| `GET` | `/procurement/{id}` | Get ticket details, vendor bids, and audit trail |
+| `POST` | `/procurement/{id}/approve` | Manager approval authorization |
+| `POST` | `/procurement/{id}/reject` | Decline procurement request |
+| `POST` | `/api/channels/simulate-message` | Inbound simulator for Telegram & Email |
+| `GET` | `/api/stats` | Executive KPI analytics & cost savings |
 
 ---
 
@@ -104,65 +110,32 @@ flowchart TD
 ### 1. Installation
 
 ```bash
-# Clone repository
 git clone https://github.com/KhushiTrivediii/caspin-agent.git
 cd caspin-agent
-
-# Install dependencies
 pip install -r requirements.txt
 ```
 
-### 2. Configuration (`.env`)
-
-Copy `.env.example` to `.env`:
-
-```env
-# Caspian SDK Configuration (Optional: runs in Sandbox mode if empty)
-CASPIAN_API_KEY=
-CASPIAN_BASE_URL=https://api.trycaspianai.com
-
-# Channel Connectors
-TELEGRAM_BOT_TOKEN=
-TELEGRAM_BOT_USERNAME=ProcurementAIBot
-EMAIL_ADDRESS=procurement@enterprise.internal
-
-# Server
-PORT=8000
-HOST=0.0.0.0
-```
-
-### 3. Run the Server
+### 2. Start the Server
 
 ```bash
 python -m backend.main
 ```
 
-Open your browser at:
+Open dashboard at:
 👉 **[http://localhost:8000](http://localhost:8000)**
-
----
-
-## 📡 REST API Reference
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/procurements` | List all procurement tickets (filter by `status`, `channel`, `search`) |
-| `GET` | `/procurement/{id}` | Get full ticket details with vendor quotes and audit trail |
-| `POST` | `/procurement` | Directly create a structured procurement ticket |
-| `POST` | `/procurement/{id}/approve` | Authorize and approve a vendor recommendation |
-| `POST` | `/procurement/{id}/reject` | Reject a procurement request |
-| `POST` | `/procurement/{id}/advance-stage` | Advance ticket through workflow stages |
-| `POST` | `/api/channels/simulate-message` | Multi-channel message simulator for Telegram & Email |
-| `GET` | `/api/stats` | Executive KPI analytics and cost savings metrics |
 
 ---
 
 ## 🧪 Automated Testing
 
-Run the end-to-end test suite:
+Run the full verification test suites:
 
 ```bash
+# Test Core Procurement Agent (6/6)
 python test_procurement_agent.py
+
+# Test Vendor Intelligence Engine (6/6)
+python test_vendor_intelligence.py
 ```
 
 ---

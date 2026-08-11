@@ -1,5 +1,7 @@
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import PlainTextResponse
+
 from backend.models import (
     ProcurementTicket,
     CreateProcurementRequest,
@@ -11,6 +13,16 @@ from backend.models import (
     ProcurementRequirement,
     ProcurementStatus,
     ChannelType,
+    VendorProfile,
+    VendorSearchRequest,
+    QuoteAnalyzeRequest,
+    QuotationAnalysisResult,
+    VendorScoreRequest,
+    VendorScoreResult,
+    NegotiationRequest,
+    NegotiationThread,
+    RecommendationRequest,
+    SupplierRecommendation,
 )
 from backend.database import (
     list_procurements,
@@ -21,13 +33,20 @@ from backend.database import (
     get_audit_logs,
     get_channel_messages,
     get_dashboard_stats,
+    list_vendors,
+    list_negotiations,
 )
 from backend.ai_engine import ai_engine
 from backend.workflow_manager import workflow_manager
 from backend.caspian_service import caspian_service
+from backend.vendor_intelligence import vendor_intelligence
 
 router = APIRouter()
 
+
+# ---------------------------------------------------------
+# Core Procurement Endpoints
+# ---------------------------------------------------------
 
 @router.get("/procurements", response_model=List[ProcurementTicket])
 async def get_all_procurements(
@@ -112,7 +131,6 @@ async def approve_procurement(procurement_id: str, payload: Optional[ApprovalAct
         notes=notes,
     )
 
-    # Disclose update notification
     await caspian_service.send_message(
         channel=ticket.channel,
         recipient_id=ticket.requester_id or "user",
@@ -163,12 +181,152 @@ async def advance_stage(procurement_id: str, payload: AdvanceStageRequest):
     return updated
 
 
+# ---------------------------------------------------------
+# Vendor Intelligence Engine APIs (Required 8 & 9)
+# ---------------------------------------------------------
+
+@router.get("/vendors", response_model=List[VendorProfile])
+async def get_vendor_directory(
+    category: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+):
+    """List all registered vendors from the enterprise supplier directory."""
+    return await list_vendors(category=category, search=search)
+
+
+@router.post("/vendors/search", response_model=List[VendorProfile])
+async def search_vendors_endpoint(payload: VendorSearchRequest):
+    """
+    1. Vendor Discovery Agent API:
+    Search vendor database & external catalogs matching product specifications and budget.
+    """
+    vendors = await vendor_intelligence.discover_vendors(
+        product=payload.product,
+        quantity=payload.quantity,
+        budget=payload.budget,
+        category=payload.category,
+    )
+    return vendors
+
+
+@router.post("/quotes/analyze", response_model=QuotationAnalysisResult)
+async def analyze_quotes_endpoint(payload: QuoteAnalyzeRequest):
+    """
+    2. Quotation Analysis Agent API:
+    Accept multiple quotations, normalize metrics, generate comparison table,
+    and evaluate price deviations.
+    """
+    result = vendor_intelligence.analyze_quotations(
+        product=payload.product,
+        quantity=payload.quantity,
+        budget=payload.budget,
+        quotes=payload.quotes,
+    )
+    return result
+
+
+@router.post("/vendors/score", response_model=List[VendorScoreResult])
+async def score_vendors_endpoint(payload: VendorScoreRequest):
+    """
+    3. Vendor Scoring Engine API:
+    Calculate composite score using:
+    40% Price, 25% Delivery, 20% Reliability, 15% Warranty.
+    """
+    scores = vendor_intelligence.score_vendors(
+        budget=payload.budget,
+        quotes=payload.quotes,
+        target_delivery_days=payload.target_delivery_days or 10,
+    )
+    return scores
+
+
+@router.post("/vendors/negotiate", response_model=NegotiationThread)
+async def negotiate_vendor_endpoint(payload: NegotiationRequest):
+    """
+    4. Negotiation Agent API:
+    Generate counter-offer negotiation email automatically, track status
+    (Sent -> Replied -> Improved Offer), and calculate savings achieved.
+    """
+    thread = await vendor_intelligence.create_and_send_negotiation(
+        vendor_name=payload.vendor_name,
+        initial_price=payload.initial_price,
+        competing_lower_price=payload.competing_lower_price,
+        target_discount_pct=payload.target_discount_percentage,
+        product_name=payload.product_name or "Laptop",
+        quantity=payload.quantity or 100,
+        vendor_email=payload.vendor_email,
+        procurement_id=payload.procurement_id or "PROC-2026-001",
+    )
+    return thread
+
+
+@router.post("/vendors/recommend", response_model=SupplierRecommendation)
+async def recommend_vendor_endpoint(payload: RecommendationRequest):
+    """
+    6. Recommendation Engine API:
+    Synthesize scores, risk flags, and delivery capabilities to output
+    the optimal supplier recommendation with justifications.
+    """
+    try:
+        rec = vendor_intelligence.recommend_supplier(
+            product=payload.product,
+            quantity=payload.quantity,
+            budget=payload.budget,
+            quotes=payload.quotes,
+        )
+        return rec
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/negotiations", response_model=List[NegotiationThread])
+async def get_negotiations_endpoint(procurement_id: Optional[str] = None):
+    """List ongoing and completed negotiation threads."""
+    return await list_negotiations(procurement_id=procurement_id)
+
+
+# ---------------------------------------------------------
+# Executive Reporting Engine Endpoints (Feature 7)
+# ---------------------------------------------------------
+
+@router.get("/reports/comparison", response_class=PlainTextResponse)
+async def get_comparison_report(
+    product: str = "Laptop",
+    quantity: int = 100,
+    budget: float = 4500000.0,
+):
+    """Generate and download Vendor Comparison Markdown Report."""
+    from backend.models import QuotationInput
+    sample_quotes = [
+        QuotationInput(vendor_name="Dell Partner (Enterprise Solutions)", price=4150000.0, delivery_days=7, warranty_years=3, vendor_rating=4.8, reliability_score=96.0),
+        QuotationInput(vendor_name="HP Commercial Direct", price=4320000.0, delivery_days=9, warranty_years=3, vendor_rating=4.6, reliability_score=92.0),
+        QuotationInput(vendor_name="Lenovo Premier Solutions", price=4400000.0, delivery_days=8, warranty_years=3, vendor_rating=4.5, reliability_score=90.0),
+    ]
+    report = vendor_intelligence.generate_vendor_comparison_report(
+        product=product,
+        quantity=quantity,
+        budget=budget,
+        quotes=sample_quotes,
+    )
+    return report
+
+
+@router.get("/reports/negotiation", response_class=PlainTextResponse)
+async def get_negotiation_report():
+    """Generate and download Negotiation Activity Markdown Report."""
+    threads = await list_negotiations()
+    report = vendor_intelligence.generate_negotiation_report(threads=threads)
+    return report
+
+
+# ---------------------------------------------------------
+# Multi-Channel Simulator & Dashboard Stats
+# ---------------------------------------------------------
+
 @router.post("/api/channels/simulate-message")
 async def simulate_channel_message(payload: SimulateMessageRequest):
     """
     Interactive Multi-Channel Simulator endpoint for Telegram & Email.
-    Allows testing conversational requirement collection, follow-ups,
-    ticket creation, and approval flows in real time.
     """
     conversation_id = payload.conversation_id or f"{payload.channel.value}_{payload.sender_id}"
     result = await workflow_manager.handle_inbound_message(

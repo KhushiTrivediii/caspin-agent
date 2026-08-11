@@ -22,6 +22,20 @@ class ChannelType(str, Enum):
     SLACK = "slack"
 
 
+class RiskLevel(str, Enum):
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+    CRITICAL = "CRITICAL"
+
+
+class NegotiationStatus(str, Enum):
+    SENT = "Sent"
+    REPLIED = "Replied"
+    IMPROVED_OFFER = "Improved Offer"
+    DECLINED = "Declined"
+
+
 class ProcurementRequirement(BaseModel):
     product: Optional[str] = Field(None, description="Name or category of the product to procure")
     quantity: Optional[int] = Field(None, description="Required quantity")
@@ -44,6 +58,21 @@ class ExtractionResult(BaseModel):
     confidence: float = 1.0
 
 
+class VendorProfile(BaseModel):
+    id: str
+    name: str
+    contact_email: str
+    phone: Optional[str] = None
+    rating: float = Field(default=4.5, ge=1.0, le=5.0)
+    reliability_score: float = Field(default=90.0, ge=0.0, le=100.0)
+    past_performance: str = "Excellent (98% on-time fulfillment, 0% dispute rate)"
+    on_time_rate: float = 98.0
+    product_categories: List[str] = Field(default_factory=list)
+    certifications: List[str] = Field(default_factory=list)
+    market_tier: str = "Enterprise Tier-1"
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class VendorQuote(BaseModel):
     id: str
     procurement_id: str
@@ -59,6 +88,80 @@ class VendorQuote(BaseModel):
     is_recommended: bool = False
     quote_notes: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class QuotationInput(BaseModel):
+    vendor_name: str
+    price: float
+    delivery_days: int
+    warranty_years: int = 1
+    vendor_rating: Optional[float] = 4.5
+    reliability_score: Optional[float] = 90.0
+    contact_email: Optional[str] = None
+    specs_matched: List[str] = Field(default_factory=list)
+    notes: Optional[str] = None
+
+
+class VendorScoreResult(BaseModel):
+    vendor: str
+    score: int
+    price_score: float
+    delivery_score: float
+    reliability_score: float
+    warranty_score: float
+    quoted_price: float
+    delivery_days: int
+    warranty_years: int
+    rank: int = 1
+    is_recommended: bool = False
+
+
+class RiskAlert(BaseModel):
+    vendor_name: str
+    risk_level: RiskLevel
+    risk_factor: str
+    reason: str
+    mitigation_advice: Optional[str] = None
+
+
+class QuotationAnalysisResult(BaseModel):
+    product: str
+    quantity: int
+    budget: float
+    market_average_price: float
+    quotes_analyzed: int
+    comparison_table: List[Dict[str, Any]]
+    scoring_results: List[VendorScoreResult]
+    risk_alerts: List[RiskAlert]
+
+
+class NegotiationThread(BaseModel):
+    id: str
+    procurement_id: Optional[str] = None
+    vendor_name: str
+    vendor_email: str
+    status: NegotiationStatus = NegotiationStatus.SENT
+    initial_price: float
+    target_price: float
+    current_price: float
+    counter_offer_text: str
+    vendor_reply_text: Optional[str] = None
+    savings_achieved: float = 0.0
+    sent_at: datetime = Field(default_factory=datetime.utcnow)
+    replied_at: Optional[datetime] = None
+
+
+class SupplierRecommendation(BaseModel):
+    recommended_vendor: str
+    recommended_price: float
+    recommended_delivery_days: int
+    recommended_warranty_years: int
+    composite_score: int
+    reasons: List[str]
+    risk_summary: str
+    score_breakdown: Dict[str, Any]
+    savings_amount: float
+    savings_percentage: float
 
 
 class ApprovalDecision(BaseModel):
@@ -117,6 +220,47 @@ class ChannelMessage(BaseModel):
     is_agent: bool = False
     procurement_id: Optional[str] = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+
+# API Payload Models
+class VendorSearchRequest(BaseModel):
+    product: str
+    quantity: int = 1
+    budget: Optional[float] = None
+    currency: str = "INR"
+    category: Optional[str] = None
+
+
+class QuoteAnalyzeRequest(BaseModel):
+    product: str
+    quantity: int
+    budget: float
+    quotes: List[QuotationInput]
+
+
+class VendorScoreRequest(BaseModel):
+    budget: float
+    target_delivery_days: Optional[int] = 10
+    quotes: List[QuotationInput]
+
+
+class NegotiationRequest(BaseModel):
+    procurement_id: Optional[str] = "PROC-2026-001"
+    vendor_name: str
+    vendor_email: Optional[str] = None
+    initial_price: float
+    competing_lower_price: Optional[float] = None
+    target_discount_percentage: float = 6.0
+    product_name: Optional[str] = "Laptop"
+    quantity: Optional[int] = 100
+
+
+class RecommendationRequest(BaseModel):
+    product: str
+    quantity: int
+    budget: float
+    target_delivery_days: Optional[int] = 10
+    quotes: List[QuotationInput]
 
 
 class CreateProcurementRequest(BaseModel):

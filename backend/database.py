@@ -12,6 +12,11 @@ from backend.models import (
     ChannelMessage,
     ApprovalDecision,
     ChannelType,
+    VendorProfile,
+    NegotiationThread,
+    NegotiationStatus,
+    RiskAlert,
+    RiskLevel,
 )
 
 DB_PATH = Path("./procurements.db")
@@ -119,6 +124,296 @@ async def init_db():
             """
         )
 
+        # Vendors Registry Table
+        await db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS vendors (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL UNIQUE,
+                contact_email TEXT NOT NULL,
+                phone TEXT,
+                rating REAL DEFAULT 4.5,
+                reliability_score REAL DEFAULT 90.0,
+                past_performance TEXT,
+                on_time_rate REAL DEFAULT 95.0,
+                product_categories TEXT,
+                certifications TEXT,
+                market_tier TEXT DEFAULT 'Enterprise Tier-1',
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+
+        # Negotiation Threads Table
+        await db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS negotiations (
+                id TEXT PRIMARY KEY,
+                procurement_id TEXT,
+                vendor_name TEXT NOT NULL,
+                vendor_email TEXT NOT NULL,
+                status TEXT NOT NULL,
+                initial_price REAL NOT NULL,
+                target_price REAL NOT NULL,
+                current_price REAL NOT NULL,
+                counter_offer_text TEXT,
+                vendor_reply_text TEXT,
+                savings_achieved REAL DEFAULT 0.0,
+                sent_at TEXT NOT NULL,
+                replied_at TEXT
+            )
+            """
+        )
+
+        # Vendor Risk Logs Table
+        await db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS vendor_risk_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                vendor_name TEXT NOT NULL,
+                risk_level TEXT NOT NULL,
+                risk_factor TEXT NOT NULL,
+                reason TEXT NOT NULL,
+                mitigation_advice TEXT,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+
+        await db.commit()
+    
+    await seed_vendor_database()
+
+
+async def seed_vendor_database():
+    """Seed initial enterprise supplier catalog."""
+    initial_vendors = [
+        VendorProfile(
+            id="VEND-DELL-01",
+            name="Dell Partner (Enterprise Solutions)",
+            contact_email="sales@dell-enterprise-partners.com",
+            phone="+91-80-4567-8901",
+            rating=4.8,
+            reliability_score=96.0,
+            past_performance="Excellent (99.2% on-time fulfillment, 0% dispute rate)",
+            on_time_rate=99.2,
+            product_categories=["Laptop", "Desktop Computer", "Server", "Monitor", "Peripherals"],
+            certifications=["Dell Titanium Certified Partner", "ISO 9001:2015", "ISO 27001"],
+            market_tier="Enterprise Tier-1 Platinum",
+        ),
+        VendorProfile(
+            id="VEND-HP-02",
+            name="HP Commercial Direct",
+            contact_email="commercial-bids@hp-direct.internal",
+            phone="+91-80-5566-7788",
+            rating=4.6,
+            reliability_score=92.0,
+            past_performance="Very Good (96.5% on-time fulfillment, 0.5% warranty claim rate)",
+            on_time_rate=96.5,
+            product_categories=["Laptop", "Desktop Computer", "Printer", "Workstation"],
+            certifications=["HP Gold Partner", "ISO 9001:2015"],
+            market_tier="Enterprise Tier-1 Gold",
+        ),
+        VendorProfile(
+            id="VEND-LENOVO-03",
+            name="Lenovo Premier Solutions",
+            contact_email="enterprise@lenovo-premier.com",
+            phone="+91-11-2345-6789",
+            rating=4.5,
+            reliability_score=90.0,
+            past_performance="Reliable (95.0% on-time fulfillment, 1.2% dispute rate)",
+            on_time_rate=95.0,
+            product_categories=["Laptop", "ThinkPad", "Server", "Monitor"],
+            certifications=["Lenovo Premier Direct Partner", "ISO 9001"],
+            market_tier="Enterprise Tier-1",
+        ),
+        VendorProfile(
+            id="VEND-APEX-04",
+            name="Apex Hardware Solutions",
+            contact_email="bids@apexhardware.net",
+            phone="+91-22-3344-5566",
+            rating=4.2,
+            reliability_score=85.0,
+            past_performance="Good (91.0% on-time delivery rate)",
+            on_time_rate=91.0,
+            product_categories=["Office Chair", "Standing Desk", "Furniture", "Peripherals"],
+            certifications=["BIFMA Level 3 Certified", "GreenGuard Gold"],
+            market_tier="Tier-2 Commercial",
+        ),
+        VendorProfile(
+            id="VEND-TECHNOVA-05",
+            name="TechNova Global Ltd",
+            contact_email="procurement@technovaglobal.com",
+            phone="+91-40-6677-8899",
+            rating=3.6,
+            reliability_score=72.0,
+            past_performance="Moderate (82.0% on-time rate, multiple delayed shipments)",
+            on_time_rate=82.0,
+            product_categories=["Laptop", "Server", "Cloud License", "Network Switch"],
+            certifications=[],  # Missing OEM certifications for risk testing
+            market_tier="Tier-3 Distributor",
+        ),
+    ]
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        for v in initial_vendors:
+            await db.execute(
+                """
+                INSERT INTO vendors (
+                    id, name, contact_email, phone, rating, reliability_score,
+                    past_performance, on_time_rate, product_categories, certifications,
+                    market_tier, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(name) DO UPDATE SET
+                    rating=excluded.rating,
+                    reliability_score=excluded.reliability_score,
+                    product_categories=excluded.product_categories,
+                    certifications=excluded.certifications
+                """,
+                (
+                    v.id,
+                    v.name,
+                    v.contact_email,
+                    v.phone,
+                    v.rating,
+                    v.reliability_score,
+                    v.past_performance,
+                    v.on_time_rate,
+                    json.dumps(v.product_categories),
+                    json.dumps(v.certifications),
+                    v.market_tier,
+                    v.created_at.isoformat(),
+                ),
+            )
+        await db.commit()
+
+
+async def list_vendors(category: Optional[str] = None, search: Optional[str] = None) -> List[VendorProfile]:
+    """Retrieve vendors from registry with category & text filtering."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        query = "SELECT * FROM vendors WHERE 1=1"
+        params = []
+
+        if search:
+            query += " AND (name LIKE ? OR product_categories LIKE ?)"
+            params.extend([f"%{search}%", f"%{search}%"])
+
+        query += " ORDER BY rating DESC"
+        cursor = await db.execute(query, tuple(params))
+        rows = await cursor.fetchall()
+        vendors = []
+        for r in rows:
+            cats = json.loads(r["product_categories"] or "[]")
+            if category and not any(category.lower() in c.lower() for c in cats):
+                continue
+            vendors.append(
+                VendorProfile(
+                    id=r["id"],
+                    name=r["name"],
+                    contact_email=r["contact_email"],
+                    phone=r["phone"],
+                    rating=r["rating"],
+                    reliability_score=r["reliability_score"],
+                    past_performance=r["past_performance"],
+                    on_time_rate=r["on_time_rate"],
+                    product_categories=cats,
+                    certifications=json.loads(r["certifications"] or "[]"),
+                    market_tier=r["market_tier"],
+                    created_at=datetime.fromisoformat(r["created_at"]),
+                )
+            )
+        return vendors
+
+
+async def save_negotiation_thread(neg: NegotiationThread) -> NegotiationThread:
+    """Save or update negotiation thread record."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            """
+            INSERT INTO negotiations (
+                id, procurement_id, vendor_name, vendor_email, status,
+                initial_price, target_price, current_price, counter_offer_text,
+                vendor_reply_text, savings_achieved, sent_at, replied_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                status=excluded.status,
+                current_price=excluded.current_price,
+                vendor_reply_text=excluded.vendor_reply_text,
+                savings_achieved=excluded.savings_achieved,
+                replied_at=excluded.replied_at
+            """,
+            (
+                neg.id,
+                neg.procurement_id,
+                neg.vendor_name,
+                neg.vendor_email,
+                neg.status.value if isinstance(neg.status, NegotiationStatus) else neg.status,
+                neg.initial_price,
+                neg.target_price,
+                neg.current_price,
+                neg.counter_offer_text,
+                neg.vendor_reply_text,
+                neg.savings_achieved,
+                neg.sent_at.isoformat(),
+                neg.replied_at.isoformat() if neg.replied_at else None,
+            ),
+        )
+        await db.commit()
+    return neg
+
+
+async def list_negotiations(procurement_id: Optional[str] = None) -> List[NegotiationThread]:
+    """Retrieve negotiation threads."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        if procurement_id:
+            cursor = await db.execute(
+                "SELECT * FROM negotiations WHERE procurement_id = ? ORDER BY sent_at DESC",
+                (procurement_id,),
+            )
+        else:
+            cursor = await db.execute("SELECT * FROM negotiations ORDER BY sent_at DESC LIMIT 50")
+        rows = await cursor.fetchall()
+        threads = []
+        for r in rows:
+            threads.append(
+                NegotiationThread(
+                    id=r["id"],
+                    procurement_id=r["procurement_id"],
+                    vendor_name=r["vendor_name"],
+                    vendor_email=r["vendor_email"],
+                    status=NegotiationStatus(r["status"]),
+                    initial_price=r["initial_price"],
+                    target_price=r["target_price"],
+                    current_price=r["current_price"],
+                    counter_offer_text=r["counter_offer_text"],
+                    vendor_reply_text=r["vendor_reply_text"],
+                    savings_achieved=r["savings_achieved"],
+                    sent_at=datetime.fromisoformat(r["sent_at"]),
+                    replied_at=datetime.fromisoformat(r["replied_at"]) if r["replied_at"] else None,
+                )
+            )
+        return threads
+
+
+async def log_vendor_risk(alert: RiskAlert):
+    """Log detected vendor risk alert into database."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            """
+            INSERT INTO vendor_risk_logs (vendor_name, risk_level, risk_factor, reason, mitigation_advice, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                alert.vendor_name,
+                alert.risk_level.value if isinstance(alert.risk_level, RiskLevel) else alert.risk_level,
+                alert.risk_factor,
+                alert.reason,
+                alert.mitigation_advice,
+                datetime.utcnow().isoformat(),
+            ),
+        )
         await db.commit()
 
 
@@ -586,6 +881,13 @@ async def get_dashboard_stats() -> Dict[str, Any]:
         )
         quote_row = await quote_cursor.fetchone()
 
+        # Count registered vendors & active negotiations
+        vend_cursor = await db.execute("SELECT COUNT(*) FROM vendors")
+        vend_count = (await vend_cursor.fetchone())[0]
+
+        neg_cursor = await db.execute("SELECT COUNT(*) FROM negotiations")
+        neg_count = (await neg_cursor.fetchone())[0]
+
         # Recent activities
         recent_cursor = await db.execute(
             "SELECT * FROM audit_logs ORDER BY timestamp DESC LIMIT 6"
@@ -614,5 +916,7 @@ async def get_dashboard_stats() -> Dict[str, Any]:
             "total_budget_requested": row["total_budget_requested"] or 0.0,
             "total_spend_committed": row["total_spend_committed"] or 0.0,
             "total_savings": (quote_row["total_savings"] or 0.0) if quote_row else 0.0,
+            "total_vendors": vend_count,
+            "total_negotiations": neg_count,
             "recent_activities": recent_logs,
         }
