@@ -3,153 +3,119 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ProcureAI | Minimal & Energetic AI Procurement Agent</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <title>ProcureAI - Enterprise Autonomous Procurement Engine</title>
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-  
-  <!-- Minimal Top Header -->
-  <header class="header">
-    <div class="brand-section" id="brand-home">
-      <div class="brand-logo">
-        <svg viewBox="0 0 24 24">
-          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-        </svg>
-        <div class="pulse-dot"></div>
-      </div>
+
+  <!-- Topbar -->
+  <header class="topbar">
+    <div class="brand-wrapper" id="nav-brand-home">
+      <div class="brand-symbol">P</div>
       <div class="brand-name">ProcureAI</div>
+      <span class="brand-env">Caspian SDK</span>
     </div>
 
-    <!-- Center Navigation Pills -->
-    <div class="nav-pill-group">
-      <button class="nav-pill-btn active" id="tab-btn-workflow" data-view="view-workflow">
-        📋 Workflow & Chat
+    <!-- Segmented Navigation -->
+    <div class="nav-segment">
+      <button class="nav-btn active" id="tab-nav-workflow" data-target="view-workflow">
+        Procurement Pipeline
       </button>
-      <button class="nav-pill-btn" id="tab-btn-vi" data-view="view-vi">
-        🧠 Vendor Intelligence
+      <button class="nav-btn" id="tab-nav-vi" data-target="view-vi">
+        Vendor Intelligence
       </button>
     </div>
 
     <!-- Right Actions -->
-    <div class="header-actions">
-      <div class="channel-status-pill">
-        <div class="dot"></div>
-        <span>Caspian Live</span>
+    <div class="topbar-right">
+      <div class="status-badge">
+        <div class="status-dot"></div>
+        <span>Gateway Active</span>
       </div>
-      <button class="btn btn-primary btn-sm" id="btn-open-create-modal">
-        + New Request
+      <button class="btn btn-primary btn-sm" id="btn-open-create">
+        + Create Request
       </button>
     </div>
   </header>
 
-  <!-- Main Workspace -->
-  <main class="main-container">
-    
-    <!-- KPI Row - Sleek Minimal Summary -->
-    <div class="kpi-row">
-      <div class="kpi-box">
-        <div>
-          <div class="kpi-meta-title">Total Requests</div>
-          <div class="kpi-num" id="kpi-total-requests">--</div>
-        </div>
-        <div class="kpi-icon-pill">📦</div>
-      </div>
+  <!-- Main Container -->
+  <main class="page-container">
 
-      <div class="kpi-box" style="border-color: rgba(245, 158, 11, 0.25);">
-        <div>
-          <div class="kpi-meta-title">Pending Approvals</div>
-          <div class="kpi-num" id="kpi-pending-approvals" style="color: #fbbf24;">--</div>
-        </div>
-        <div class="kpi-icon-pill" style="color: #fbbf24;">⏳</div>
+    <!-- Executive Metrics Row -->
+    <div class="metrics-row">
+      <div class="metric-card">
+        <div class="metric-label">Total Requests</div>
+        <div class="metric-value" id="kpi-total-requests">--</div>
       </div>
-
-      <div class="kpi-box">
-        <div>
-          <div class="kpi-meta-title">Committed Spend</div>
-          <div class="kpi-num" id="kpi-committed-spend">--</div>
-        </div>
-        <div class="kpi-icon-pill">💳</div>
+      <div class="metric-card">
+        <div class="metric-label">Pending Approval</div>
+        <div class="metric-value" id="kpi-pending-approvals" style="color: var(--warning-text);">--</div>
       </div>
-
-      <div class="kpi-box" style="border-color: rgba(16, 185, 129, 0.25);">
-        <div>
-          <div class="kpi-meta-title">Cost Savings</div>
-          <div class="kpi-num" id="kpi-total-savings" style="color: #34d399;">--</div>
-        </div>
-        <div class="kpi-icon-pill" style="color: #34d399;">💰</div>
+      <div class="metric-card">
+        <div class="metric-label">Committed Spend</div>
+        <div class="metric-value" id="kpi-committed-spend">--</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Negotiated Savings</div>
+        <div class="metric-value" id="kpi-total-savings" style="color: var(--success-text);">--</div>
       </div>
     </div>
 
-    <!-- VIEW 1: Clean Workflow & AI Chat Sandbox -->
-    <section class="tab-view active-view" id="view-workflow">
-      <div class="workflow-layout">
-        
-        <!-- Left: Procurement Ticket Pipeline -->
-        <div class="clean-panel">
-          <div class="panel-header-bar">
+    <!-- VIEW 1: Procurement Pipeline & Multi-Channel Assistant -->
+    <section class="view-panel active" id="view-workflow">
+      <div class="layout-split">
+
+        <!-- Left: Procurement Tickets Stream -->
+        <div class="surface-card">
+          <div class="surface-header">
             <div style="display: flex; align-items: center; gap: 10px;">
-              <div class="section-heading">Procurement Pipeline</div>
-              <span id="pipeline-count" style="font-size: 0.75rem; color: var(--primary-light); background: rgba(99, 102, 241, 0.12); padding: 2px 8px; border-radius: 9999px; font-weight: 700;">0 Tickets</span>
+              <span class="surface-title">Procurement Requests</span>
+              <span id="ticket-count-badge" style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">0 items</span>
             </div>
 
-            <div style="display: flex; align-items: center; gap: 10px;">
-              <div class="search-wrap">
-                <span class="search-icon-fixed">🔍</span>
-                <input type="text" class="search-input-box" id="search-input" placeholder="Search items, IDs...">
-              </div>
-
-              <div class="filter-pill-container" id="status-filter-tabs">
-                <div class="filter-pill active" data-status="">All</div>
-                <div class="filter-pill" data-status="Approval Pending">Pending</div>
-                <div class="filter-pill" data-status="Approved">Approved</div>
-                <div class="filter-pill" data-status="Completed">Completed</div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <input type="text" class="search-control" id="search-query" placeholder="Filter by product, ID...">
+              <div class="filter-group" id="filter-tabs">
+                <button class="filter-chip active" data-status="">All</button>
+                <button class="filter-chip" data-status="Approval Pending">Pending</button>
+                <button class="filter-chip" data-status="Approved">Approved</button>
+                <button class="filter-chip" data-status="Completed">Completed</button>
               </div>
             </div>
           </div>
 
-          <div class="ticket-stream" id="procurement-cards-container">
-            <!-- Dynamically populated tickets -->
+          <div class="ticket-container" id="ticket-list-container">
+            <!-- Dynamic Ticket Rows -->
           </div>
         </div>
 
-        <!-- Right: AI Multi-Channel Sandbox -->
-        <div class="clean-panel chat-container">
-          <div class="panel-header-bar" style="padding: 14px 20px;">
-            <div class="section-heading" style="font-size: 0.95rem;">AI Channel Agent</div>
-            <span style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--primary-light);">Caspian SDK</span>
+        <!-- Right: Multi-Channel Communication Assistant -->
+        <div class="surface-card chat-wrapper">
+          <div class="surface-header" style="padding: 12px 16px;">
+            <span class="surface-title" style="font-size: 13px;">Channel Interface</span>
+            <span style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">Inbound Gateway</span>
           </div>
 
-          <!-- Channel Switcher -->
-          <div class="channel-switch-bar">
-            <button class="channel-btn active telegram" id="sim-tab-telegram" data-channel="telegram">
-              ✈️ Telegram Bot
-            </button>
-            <button class="channel-btn email" id="sim-tab-email" data-channel="email">
-              ✉️ Corporate Email
-            </button>
+          <div class="channel-tabs">
+            <button class="channel-tab-btn active" id="channel-btn-tg" data-channel="telegram">Telegram</button>
+            <button class="channel-tab-btn" id="channel-btn-email" data-channel="email">Email</button>
           </div>
 
-          <!-- Quick Test Chips -->
-          <div class="chat-quick-chips">
-            <button class="chip-btn" data-text="Need 100 laptops.">1. "Need 100 laptops."</button>
-            <button class="chip-btn" data-text="Budget is 45 lakhs and delivery in 10 days with i5, 16GB RAM, 512GB SSD">2. "Budget 45L, 10 days..."</button>
-            <button class="chip-btn" data-text="APPROVE">3. "APPROVE"</button>
+          <div class="chat-prompt-hints">
+            <button class="hint-pill" data-text="Need 100 laptops.">1. "Need 100 laptops."</button>
+            <button class="hint-pill" data-text="Budget is 45 lakhs and delivery in 10 days with i5, 16GB RAM, 512GB SSD">2. "Budget 45L, 10 days..."</button>
+            <button class="hint-pill" data-text="APPROVE">3. "APPROVE"</button>
           </div>
 
-          <!-- Live Chat Stream -->
-          <div class="chat-bubble-stream" id="chat-stream">
-            <div class="chat-msg agent">
-              <div style="font-size: 0.72rem; font-weight: 700; color: var(--primary-light); margin-bottom: 4px;">🤖 Caspian AI Agent</div>
-              <div>Hello! I'm your AI Procurement Agent. Send me any requirement to gather specs, compare vendor quotes, and request manager approval.</div>
+          <div class="chat-message-list" id="chat-stream">
+            <div class="chat-entry agent">
+              <div style="font-size: 11px; font-weight: 600; color: var(--primary-text); margin-bottom: 2px;">Procurement Assistant</div>
+              <div>Ready to receive procurement requests. Send item details to extract specifications and obtain competitive quotes.</div>
             </div>
           </div>
 
-          <!-- Chat Input -->
-          <form id="chat-form" class="chat-input-row">
-            <input type="text" id="chat-input" class="chat-field" placeholder="Type message (e.g. 'Need 100 laptops.')..." autocomplete="off">
+          <form id="chat-form" class="chat-input-bar">
+            <input type="text" id="chat-input" class="chat-text-input" placeholder="Enter message or requirement..." autocomplete="off">
             <button type="submit" class="btn btn-primary btn-sm">Send</button>
           </form>
         </div>
@@ -157,70 +123,69 @@
       </div>
     </section>
 
-    <!-- VIEW 2: Clean Vendor Intelligence Hub -->
-    <section class="tab-view" id="view-vi">
+    <!-- VIEW 2: Vendor Intelligence & Scoring Engine -->
+    <section class="view-panel" id="view-vi">
       
-      <!-- Top Action Ribbon -->
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
-        <div style="display: flex; gap: 10px;">
-          <button class="btn btn-primary btn-sm" id="btn-run-sample-analysis">
-            ⚡ Analyze Quotes (100 Laptops)
+      <!-- Top Action Toolbar -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 12px; flex-wrap: wrap;">
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-primary btn-sm" id="btn-run-analysis">
+            Evaluate 4-Factor Quotation Model
           </button>
-          <button class="btn btn-glass btn-sm" id="btn-trigger-negotiation-demo">
-            🤝 Launch AI Negotiation
+          <button class="btn btn-secondary btn-sm" id="btn-run-negotiation">
+            Dispatch Counter-Offer Email
           </button>
         </div>
-        <div style="display: flex; gap: 10px;">
-          <button class="btn btn-glass btn-sm" id="btn-view-comparison-report">
-            📄 Comparison Report
+
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-secondary btn-sm" id="btn-open-comp-report">
+            Comparison Report
           </button>
-          <button class="btn btn-glass btn-sm" id="btn-view-negotiation-report">
-            📑 Negotiation Report
+          <button class="btn btn-secondary btn-sm" id="btn-open-neg-report">
+            Negotiation Report
           </button>
         </div>
       </div>
 
-      <div class="vi-layout">
+      <div class="vi-grid-2">
         
-        <!-- Left: 4-Factor Weighted Scoring Matrix -->
-        <div class="clean-panel">
-          <div class="panel-header-bar">
-            <div class="section-heading">4-Factor Quotation Scoring</div>
-            <span style="font-size: 0.72rem; color: #34d399; font-weight: 600;">40% Price • 25% Deliv • 20% Rel • 15% Warr</span>
+        <!-- Left: 4-Factor Scoring Matrix -->
+        <div class="surface-card">
+          <div class="surface-header">
+            <span class="surface-title">Quotation Scoring (40% Price, 25% Delivery, 20% Reliability, 15% Warranty)</span>
           </div>
-
-          <div style="padding: 20px;" id="scoring-matrix-container">
-            <div style="text-align: center; padding: 32px; color: var(--text-muted); font-size: 0.85rem;">
-              Click <b>"Analyze Quotes"</b> above to evaluate multi-vendor bids.
+          <div style="padding: 16px;" id="scoring-results-container">
+            <div style="text-align: center; padding: 32px; color: var(--text-muted); font-size: 13px;">
+              Click <b>"Evaluate 4-Factor Quotation Model"</b> to compare multi-vendor bids.
             </div>
           </div>
         </div>
 
-        <!-- Right: Risk Radar & Negotiation Activity -->
-        <div style="display: flex; flex-direction: column; gap: 24px;">
+        <!-- Right: Risk Alerts & Negotiation Tracker -->
+        <div style="display: flex; flex-direction: column; gap: 20px;">
           
           <!-- Risk Radar Card -->
-          <div class="clean-panel">
-            <div class="panel-header-bar">
-              <div class="section-heading">Vendor Risk Radar</div>
-              <span id="risk-count-badge" style="font-size: 0.72rem; color: #fbbf24; font-weight: 700;">0 Alerts</span>
+          <div class="surface-card">
+            <div class="surface-header">
+              <span class="surface-title">Vendor Compliance & Risk Analysis</span>
+              <span id="risk-count-label" style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">0 alerts</span>
             </div>
-            <div style="padding: 18px;" id="risk-radar-container">
-              <div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 0.82rem;">
-                Risk radar monitoring price dumping and certifications.
+            <div style="padding: 16px;" id="risk-alerts-container">
+              <div style="text-align: center; padding: 18px; color: var(--text-muted); font-size: 12px;">
+                Risk radar monitoring price dumping, low vendor ratings, and delivery delays.
               </div>
             </div>
           </div>
 
-          <!-- Negotiation Activity Card -->
-          <div class="clean-panel">
-            <div class="panel-header-bar">
-              <div class="section-heading">AI Negotiation Tracker</div>
-              <span style="font-size: 0.72rem; color: var(--primary-light); font-weight: 600;">Automated Concessions</span>
+          <!-- Negotiation Concession Tracker -->
+          <div class="surface-card">
+            <div class="surface-header">
+              <span class="surface-title">Negotiation Concessions</span>
+              <span style="font-family: var(--font-mono); font-size: 11px; color: var(--success-text);">Live Tracker</span>
             </div>
-            <div style="padding: 18px;" id="negotiations-container">
-              <div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 0.82rem;">
-                No active negotiations. Click "Launch AI Negotiation".
+            <div style="padding: 16px;" id="negotiations-list-container">
+              <div style="text-align: center; padding: 18px; color: var(--text-muted); font-size: 12px;">
+                No active negotiations. Click "Dispatch Counter-Offer Email".
               </div>
             </div>
           </div>
@@ -232,81 +197,81 @@
 
   </main>
 
-  <!-- Modal 1: Ticket Details Drawer -->
-  <div class="modal-overlay" id="ticket-modal">
-    <div class="modal-window large">
-      <div class="modal-top">
+  <!-- Modal 1: Ticket Details -->
+  <div class="modal-backdrop" id="ticket-modal">
+    <div class="modal-content large">
+      <div class="modal-header-line">
         <div>
-          <div class="section-heading" id="modal-ticket-id">PROC-2026-XXX</div>
-          <div style="font-size: 0.78rem; color: var(--text-muted);" id="modal-ticket-title">Ticket Details</div>
+          <span class="surface-title" id="modal-ticket-id">PROC-2026-XXX</span>
+          <div style="font-size: 12px; color: var(--text-muted);" id="modal-ticket-title">Title</div>
         </div>
-        <button class="modal-close-btn" id="btn-close-ticket-modal">&times;</button>
+        <button class="modal-close" id="btn-close-ticket">&times;</button>
       </div>
-      <div id="modal-ticket-content"></div>
+      <div id="modal-ticket-body"></div>
     </div>
   </div>
 
-  <!-- Modal 2: Create Procurement Request -->
-  <div class="modal-overlay" id="create-modal">
-    <div class="modal-window">
-      <div class="modal-top">
-        <div class="section-heading">New Procurement Request</div>
-        <button class="modal-close-btn" id="btn-close-create-modal">&times;</button>
+  <!-- Modal 2: Create Request -->
+  <div class="modal-backdrop" id="create-modal">
+    <div class="modal-content">
+      <div class="modal-header-line">
+        <span class="surface-title">Create Procurement Ticket</span>
+        <button class="modal-close" id="btn-close-create">&times;</button>
       </div>
 
-      <form id="form-create-procurement">
-        <div class="form-field-group">
-          <label class="form-label-text">Product or Equipment Name</label>
-          <input type="text" id="create-product" class="form-input" placeholder="e.g. Laptop, Server, Office Chair" required>
+      <form id="form-create">
+        <div class="form-group">
+          <label class="form-label">Product / Category</label>
+          <input type="text" id="inp-product" class="form-control" placeholder="e.g. Laptop, Server, Monitor" required>
         </div>
 
-        <div class="form-row-2">
-          <div class="form-field-group">
-            <label class="form-label-text">Quantity</label>
-            <input type="number" id="create-quantity" class="form-input" placeholder="100" min="1" required>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Quantity</label>
+            <input type="number" id="inp-qty" class="form-control" placeholder="100" min="1" required>
           </div>
-          <div class="form-field-group">
-            <label class="form-label-text">Budget (₹ INR)</label>
-            <input type="number" id="create-budget" class="form-input" placeholder="4500000" min="100" required>
+          <div class="form-group">
+            <label class="form-label">Budget (₹ INR)</label>
+            <input type="number" id="inp-budget" class="form-control" placeholder="4500000" min="100" required>
           </div>
         </div>
 
-        <div class="form-row-2">
-          <div class="form-field-group">
-            <label class="form-label-text">Delivery Timeline (Days)</label>
-            <input type="number" id="create-delivery" class="form-input" placeholder="10" min="1" required>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Delivery Timeline (Days)</label>
+            <input type="number" id="inp-delivery" class="form-control" placeholder="10" min="1" required>
           </div>
-          <div class="form-field-group">
-            <label class="form-label-text">Source Channel</label>
-            <select id="create-channel" class="form-input">
+          <div class="form-group">
+            <label class="form-label">Channel</label>
+            <select id="inp-channel" class="form-control">
               <option value="telegram">Telegram</option>
-              <option value="email">Corporate Email</option>
-              <option value="web">Web Dashboard</option>
+              <option value="email">Email</option>
+              <option value="web">Web</option>
             </select>
           </div>
         </div>
 
-        <div class="form-field-group">
-          <label class="form-label-text">Specifications (comma separated)</label>
-          <input type="text" id="create-specs" class="form-input" placeholder="i5 13th Gen, 16GB RAM, 512GB SSD">
+        <div class="form-group">
+          <label class="form-label">Specifications (comma separated)</label>
+          <input type="text" id="inp-specs" class="form-control" placeholder="i5 13th Gen, 16GB RAM, 512GB SSD">
         </div>
 
-        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px;">
-          <button type="button" class="btn btn-glass btn-sm" id="btn-cancel-create">Cancel</button>
-          <button type="submit" class="btn btn-primary btn-sm">Launch Request</button>
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-cancel-create">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">Create Request</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- Modal 3: Report Preview Modal -->
-  <div class="modal-overlay" id="report-modal">
-    <div class="modal-window large">
-      <div class="modal-top">
-        <div class="section-heading" id="report-modal-title">Executive Report</div>
-        <button class="modal-close-btn" id="btn-close-report-modal">&times;</button>
+  <!-- Modal 3: Report Viewer -->
+  <div class="modal-backdrop" id="report-modal">
+    <div class="modal-content large">
+      <div class="modal-header-line">
+        <span class="surface-title" id="report-modal-heading">Executive Report</span>
+        <button class="modal-close" id="btn-close-report">&times;</button>
       </div>
-      <pre id="report-modal-body" style="background: #060911; border: 1px solid var(--border-subtle); padding: 18px; border-radius: 8px; font-family: var(--font-mono); font-size: 0.78rem; color: #cbd5e1; white-space: pre-wrap; max-height: 60vh; overflow-y: auto; line-height: 1.5;"></pre>
+      <pre id="report-modal-content" style="background: var(--bg-input); border: 1px solid var(--border-subtle); padding: 16px; border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 12px; color: var(--text-primary); white-space: pre-wrap; line-height: 1.5; max-height: 60vh; overflow-y: auto;"></pre>
     </div>
   </div>
 

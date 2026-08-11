@@ -1,9 +1,8 @@
 /**
- * ProcureAI - Minimal, Modern & Energetic Frontend Controller
+ * ProcureAI - Enterprise Procurement & Vendor Intelligence Frontend Controller
  */
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Application State
   const state = {
     procurements: [],
     negotiations: [],
@@ -15,53 +14,53 @@ document.addEventListener('DOMContentLoaded', () => {
     simSenderName: 'Sarah Chen (Lead)',
   };
 
-  // Nav Tabs
-  const tabBtnWorkflow = document.getElementById('tab-btn-workflow');
-  const tabBtnVi = document.getElementById('tab-btn-vi');
+  // Nav
+  const tabNavWorkflow = document.getElementById('tab-nav-workflow');
+  const tabNavVi = document.getElementById('tab-nav-vi');
   const viewWorkflow = document.getElementById('view-workflow');
   const viewVi = document.getElementById('view-vi');
-  const brandHome = document.getElementById('brand-home');
+  const navBrandHome = document.getElementById('nav-brand-home');
 
-  // KPI Elements
+  // Metrics
   const kpiTotalRequests = document.getElementById('kpi-total-requests');
   const kpiPendingApprovals = document.getElementById('kpi-pending-approvals');
   const kpiCommittedSpend = document.getElementById('kpi-committed-spend');
   const kpiTotalSavings = document.getElementById('kpi-total-savings');
 
-  // Workflow Pipeline Elements
-  const cardsContainer = document.getElementById('procurement-cards-container');
-  const pipelineCount = document.getElementById('pipeline-count');
-  const searchInput = document.getElementById('search-input');
-  const filterTabs = document.getElementById('status-filter-tabs');
+  // Pipeline Elements
+  const ticketListContainer = document.getElementById('ticket-list-container');
+  const ticketCountBadge = document.getElementById('ticket-count-badge');
+  const searchQuery = document.getElementById('search-query');
+  const filterTabs = document.getElementById('filter-tabs');
 
-  // Simulator Elements
-  const simTabTelegram = document.getElementById('sim-tab-telegram');
-  const simTabEmail = document.getElementById('sim-tab-email');
+  // Channel Interface Elements
+  const channelBtnTg = document.getElementById('channel-btn-tg');
+  const channelBtnEmail = document.getElementById('channel-btn-email');
   const chatStream = document.getElementById('chat-stream');
   const chatForm = document.getElementById('chat-form');
   const chatInput = document.getElementById('chat-input');
-  const quickChips = document.querySelectorAll('.chip-btn');
+  const hintPills = document.querySelectorAll('.hint-pill');
 
   // Vendor Intelligence Elements
-  const btnRunSampleAnalysis = document.getElementById('btn-run-sample-analysis');
-  const btnTriggerNegotiationDemo = document.getElementById('btn-trigger-negotiation-demo');
-  const btnViewComparisonReport = document.getElementById('btn-view-comparison-report');
-  const btnViewNegotiationReport = document.getElementById('btn-view-negotiation-report');
-  const scoringMatrixContainer = document.getElementById('scoring-matrix-container');
-  const riskRadarContainer = document.getElementById('risk-radar-container');
-  const riskCountBadge = document.getElementById('risk-count-badge');
-  const negotiationsContainer = document.getElementById('negotiations-container');
+  const btnRunAnalysis = document.getElementById('btn-run-analysis');
+  const btnRunNegotiation = document.getElementById('btn-run-negotiation');
+  const btnOpenCompReport = document.getElementById('btn-open-comp-report');
+  const btnOpenNegReport = document.getElementById('btn-open-neg-report');
+  const scoringResultsContainer = document.getElementById('scoring-results-container');
+  const riskAlertsContainer = document.getElementById('risk-alerts-container');
+  const riskCountLabel = document.getElementById('risk-count-label');
+  const negotiationsListContainer = document.getElementById('negotiations-list-container');
 
   // Modals Elements
   const ticketModal = document.getElementById('ticket-modal');
   const createModal = document.getElementById('create-modal');
   const reportModal = document.getElementById('report-modal');
-  const btnOpenCreateModal = document.getElementById('btn-open-create-modal');
-  const btnCloseTicketModal = document.getElementById('btn-close-ticket-modal');
-  const btnCloseCreateModal = document.getElementById('btn-close-create-modal');
-  const btnCloseReportModal = document.getElementById('btn-close-report-modal');
+  const btnOpenCreate = document.getElementById('btn-open-create');
+  const btnCloseTicket = document.getElementById('btn-close-ticket');
+  const btnCloseCreate = document.getElementById('btn-close-create');
+  const btnCloseReport = document.getElementById('btn-close-report');
   const btnCancelCreate = document.getElementById('btn-cancel-create');
-  const formCreateProcurement = document.getElementById('form-create-procurement');
+  const formCreate = document.getElementById('form-create');
 
   // ---------------------------------------------------------
   // Helper Formatters
@@ -73,36 +72,40 @@ document.addEventListener('DOMContentLoaded', () => {
     return `₹${Number(amount).toLocaleString('en-IN')}`;
   }
 
-  function getStatusClass(status) {
-    return (status || '').toLowerCase().replace(/\s+/g, '-');
+  function getStatusBadgeClass(status) {
+    const s = (status || '').toLowerCase();
+    if (s.includes('pending')) return 'pending';
+    if (s.includes('approved') || s.includes('completed')) return 'approved';
+    if (s.includes('rejected')) return 'rejected';
+    return 'open';
   }
 
   // ---------------------------------------------------------
-  // Tab Navigation
+  // Navigation
   // ---------------------------------------------------------
-  function switchView(target) {
+  function setView(target) {
     if (target === 'view-workflow') {
-      tabBtnWorkflow.classList.add('active');
-      tabBtnVi.classList.remove('active');
-      viewWorkflow.classList.add('active-view');
-      viewVi.classList.remove('active-view');
+      tabNavWorkflow.classList.add('active');
+      tabNavVi.classList.remove('active');
+      viewWorkflow.classList.add('active');
+      viewVi.classList.remove('active');
     } else {
-      tabBtnVi.classList.add('active');
-      tabBtnWorkflow.classList.remove('active');
-      viewVi.classList.add('active-view');
-      viewWorkflow.classList.remove('active-view');
+      tabNavVi.classList.add('active');
+      tabNavWorkflow.classList.remove('active');
+      viewVi.classList.add('active');
+      viewWorkflow.classList.remove('active');
       fetchNegotiations();
     }
   }
 
-  tabBtnWorkflow.addEventListener('click', () => switchView('view-workflow'));
-  tabBtnVi.addEventListener('click', () => switchView('view-vi'));
-  brandHome.addEventListener('click', () => switchView('view-workflow'));
+  tabNavWorkflow.addEventListener('click', () => setView('view-workflow'));
+  tabNavVi.addEventListener('click', () => setView('view-vi'));
+  navBrandHome.addEventListener('click', () => setView('view-workflow'));
 
   // ---------------------------------------------------------
-  // Data Loaders
+  // API Fetch Functions
   // ---------------------------------------------------------
-  async function loadDashboardData() {
+  async function loadDashboard() {
     await Promise.all([fetchStats(), fetchProcurements()]);
   }
 
@@ -132,7 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!res.ok) return;
       const data = await res.json();
       state.procurements = data;
-      renderCards(data);
+      renderTickets(data);
     } catch (err) {
       console.error('Error fetching procurements:', err);
     }
@@ -162,78 +165,74 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ---------------------------------------------------------
-  // Render Clean Procurement Cards
+  // Render Procurement Tickets
   // ---------------------------------------------------------
-  function renderCards(tickets) {
-    pipelineCount.textContent = `${tickets.length} Ticket${tickets.length === 1 ? '' : 's'}`;
+  function renderTickets(tickets) {
+    ticketCountBadge.textContent = `${tickets.length} item${tickets.length === 1 ? '' : 's'}`;
 
     if (!tickets || tickets.length === 0) {
-      cardsContainer.innerHTML = `
-        <div style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
-          <div style="font-size: 2rem; margin-bottom: 6px;">📭</div>
-          <div style="font-weight: 600; color: var(--text-secondary);">No procurement requests</div>
-          <div style="font-size: 0.78rem; margin-top: 4px;">Use the AI Agent on the right or click "+ New Request" to create one.</div>
+      ticketListContainer.innerHTML = `
+        <div style="text-align: center; padding: 48px 20px; color: var(--text-muted);">
+          <div style="font-weight: 500; color: var(--text-secondary); margin-bottom: 4px;">No procurement records found</div>
+          <div style="font-size: 12px;">Create a new request or use the channel assistant to submit an order.</div>
         </div>
       `;
       return;
     }
 
-    cardsContainer.innerHTML = tickets.map(ticket => {
-      const statusClass = getStatusClass(ticket.status);
+    ticketListContainer.innerHTML = tickets.map(ticket => {
+      const badgeClass = getStatusBadgeClass(ticket.status);
       const isPending = ticket.status === 'Approval Pending';
 
-      const specsHtml = (ticket.specifications || []).slice(0, 3).map(s => 
-        `<span class="tag-pill">${escapeHtml(s)}</span>`
-      ).join('');
+      const specsLine = (ticket.specifications || []).slice(0, 3).map(s => 
+        `<span class="tag-badge" style="background: var(--bg-surface-raised); color: var(--text-secondary); border: 1px solid var(--border-subtle);">${escapeHtml(s)}</span>`
+      ).join(' ');
 
       return `
-        <div class="ticket-item" data-id="${ticket.id}">
-          <div class="ticket-top-meta">
+        <div class="ticket-row" data-id="${ticket.id}">
+          <div class="ticket-row-top">
             <div style="display: flex; align-items: center; gap: 8px;">
-              <span class="ticket-code">${ticket.id}</span>
-              <span class="tag-pill" style="text-transform: capitalize;">${ticket.channel}</span>
+              <span class="ticket-id">${ticket.id}</span>
+              <span class="tag-badge" style="background: var(--bg-surface-raised); text-transform: capitalize; color: var(--text-secondary);">${ticket.channel}</span>
             </div>
-            <span class="status-chip ${statusClass}">
-              ● ${ticket.status}
-            </span>
+            <span class="tag-badge ${badgeClass}">${ticket.status}</span>
           </div>
 
-          <div class="ticket-heading">${escapeHtml(ticket.title || `${ticket.quantity}x ${ticket.product}`)}</div>
-          
-          <div class="ticket-tags">
-            <span class="tag-pill" style="color: var(--primary-light);">📦 ${ticket.quantity} Units</span>
-            <span class="tag-pill">⏱️ ${ticket.delivery_days} Days</span>
-            ${specsHtml}
+          <div class="ticket-title">${escapeHtml(ticket.title || `${ticket.quantity}x ${ticket.product}`)}</div>
+
+          <div class="ticket-meta-line">
+            <span>Quantity: <b>${ticket.quantity}</b></span>
+            <span>Target Delivery: <b>${ticket.delivery_days} Days</b></span>
+            ${specsLine}
           </div>
 
-          <div class="quote-highlight-box">
+          <div class="ticket-quote-summary">
             <div>
-              <div style="font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase;">Recommended Supplier</div>
-              <div style="font-size: 0.88rem; font-weight: 700; color: var(--text-main); margin-top: 1px;">
-                🏢 ${escapeHtml(ticket.recommended_vendor || 'Vendor Bids Pending')}
-              </div>
+              <span style="color: var(--text-muted);">Recommended Supplier:</span>
+              <b style="color: var(--text-primary); margin-left: 4px;">${escapeHtml(ticket.recommended_vendor || 'Pending Evaluation')}</b>
             </div>
-            <div style="text-align: right;">
-              <div class="highlight-price">${formatINR(ticket.recommended_price || ticket.budget)}</div>
-              <div style="font-size: 0.72rem; color: var(--text-muted);">Budget: ${formatINR(ticket.budget)}</div>
+            <div>
+              <span style="color: var(--text-muted); font-size: 11px;">Offer:</span>
+              <b style="color: var(--success-text); margin-left: 4px; font-family: var(--font-mono);">${formatINR(ticket.recommended_price || ticket.budget)}</b>
+              <span style="color: var(--text-muted); font-size: 11px; margin-left: 6px;">(Budget: ${formatINR(ticket.budget)})</span>
             </div>
           </div>
 
-          <div class="ticket-action-bar">
-            <span style="font-size: 0.75rem; color: var(--text-muted);">
-              👤 ${escapeHtml(ticket.requester_name || 'Employee')}
+          <div class="ticket-row-bottom">
+            <span style="font-size: 12px; color: var(--text-muted);">
+              Requester: ${escapeHtml(ticket.requester_name || 'Staff')}
             </span>
 
             <div style="display: flex; gap: 6px;">
-              <button class="btn btn-glass btn-sm btn-view-details" data-id="${ticket.id}">
+              <button class="btn btn-secondary btn-sm btn-ticket-details" data-id="${ticket.id}">
                 Details
               </button>
               ${isPending ? `
-                <button class="btn btn-success btn-sm btn-approve" data-id="${ticket.id}">
-                  ✓ Approve
+                <button class="btn btn-success btn-sm btn-ticket-approve" data-id="${ticket.id}">
+                  Approve
                 </button>
-                <button class="btn btn-danger btn-sm btn-reject" data-id="${ticket.id}">
-                  ✕ Reject
+                <button class="btn btn-danger btn-sm btn-ticket-reject" data-id="${ticket.id}">
+                  Reject
                 </button>
               ` : ''}
             </div>
@@ -243,23 +242,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }).join('');
 
     // Attach listeners
-    document.querySelectorAll('.btn-view-details').forEach(btn => {
+    document.querySelectorAll('.btn-ticket-details').forEach(btn => {
       btn.addEventListener('click', () => openTicketModal(btn.dataset.id));
     });
 
-    document.querySelectorAll('.btn-approve').forEach(btn => {
-      btn.addEventListener('click', () => handleApprovalAction(btn.dataset.id, 'approve'));
+    document.querySelectorAll('.btn-ticket-approve').forEach(btn => {
+      btn.addEventListener('click', () => handleApproval(btn.dataset.id, 'approve'));
     });
 
-    document.querySelectorAll('.btn-reject').forEach(btn => {
-      btn.addEventListener('click', () => handleApprovalAction(btn.dataset.id, 'reject'));
+    document.querySelectorAll('.btn-ticket-reject').forEach(btn => {
+      btn.addEventListener('click', () => handleApproval(btn.dataset.id, 'reject'));
     });
   }
 
   // ---------------------------------------------------------
-  // Sample Quotation Analysis & 4-Factor Scoring
+  // Quotation Scoring Execution
   // ---------------------------------------------------------
-  btnRunSampleAnalysis.addEventListener('click', async () => {
+  btnRunAnalysis.addEventListener('click', async () => {
     const samplePayload = {
       product: "Laptop",
       quantity: 100,
@@ -300,7 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
       ]
     };
 
-    scoringMatrixContainer.innerHTML = `<div style="text-align: center; padding: 20px; color: var(--primary-light);">Computing 4-Factor Weighted Model (40% Price, 25% Delivery, 20% Reliability, 15% Warranty)...</div>`;
+    scoringResultsContainer.innerHTML = `<div style="text-align: center; padding: 20px; color: var(--primary-text); font-size: 13px;">Computing 4-Factor Weighted Model...</div>`;
 
     try {
       const res = await fetch('/quotes/analyze', {
@@ -313,56 +312,57 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await res.json();
 
       // Render 4-Factor Scoring Cards
-      scoringMatrixContainer.innerHTML = data.scoring_results.map(s => `
-        <div class="score-item-card" style="${s.is_recommended ? 'border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.05);' : ''}">
-          <div class="score-top">
+      scoringResultsContainer.innerHTML = data.scoring_results.map(s => `
+        <div class="vendor-score-row" style="${s.is_recommended ? 'border-color: rgba(16, 185, 129, 0.4);' : ''}">
+          <div class="vendor-score-top">
             <div>
-              <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-main);">
+              <div style="font-weight: 600; font-size: 13px; color: var(--text-primary);">
                 #${s.rank} ${escapeHtml(s.vendor)}
+                ${s.is_recommended ? '<span class="tag-badge approved" style="margin-left: 6px;">Top Ranked</span>' : ''}
               </div>
-              <div style="font-size: 0.74rem; color: var(--text-secondary); margin-top: 1px;">
-                Quoted: <b style="color: #34d399;">${formatINR(s.quoted_price)}</b> • ${s.delivery_days} Days • ${s.warranty_years}-Yr Warranty
+              <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">
+                Quoted: <b style="color: var(--success-text); font-family: var(--font-mono);">${formatINR(s.quoted_price)}</b> • ${s.delivery_days} Days Lead Time • ${s.warranty_years}-Year Warranty
               </div>
             </div>
-            <div class="score-large">${s.score}<span style="font-size: 0.72rem; color: var(--text-muted);">/100</span></div>
+            <div class="score-badge">${s.score}<span style="font-size: 11px; color: var(--text-muted);">/100</span></div>
           </div>
 
-          <div class="score-grid-4">
-            <div class="sub-score-box">
-              <div class="sub-score-label">Price (40%)</div>
-              <div class="sub-score-value">${s.price_score}</div>
+          <div class="score-sub-grid">
+            <div class="score-cell">
+              <div class="score-cell-label">Price (40%)</div>
+              <div class="score-cell-val">${s.price_score}</div>
             </div>
-            <div class="sub-score-box">
-              <div class="sub-score-label">Delivery (25%)</div>
-              <div class="sub-score-value">${s.delivery_score}</div>
+            <div class="score-cell">
+              <div class="score-cell-label">Delivery (25%)</div>
+              <div class="score-cell-val">${s.delivery_score}</div>
             </div>
-            <div class="sub-score-box">
-              <div class="sub-score-label">Reliability (20%)</div>
-              <div class="sub-score-value">${s.reliability_score}</div>
+            <div class="score-cell">
+              <div class="score-cell-label">Reliability (20%)</div>
+              <div class="score-cell-val">${s.reliability_score}</div>
             </div>
-            <div class="sub-score-box">
-              <div class="sub-score-label">Warranty (15%)</div>
-              <div class="sub-score-value">${s.warranty_score}</div>
+            <div class="score-cell">
+              <div class="score-cell-label">Warranty (15%)</div>
+              <div class="score-cell-val">${s.warranty_score}</div>
             </div>
           </div>
         </div>
       `).join('');
 
       // Render Risk Alerts
-      riskCountBadge.textContent = `${data.risk_alerts.length} Alert${data.risk_alerts.length === 1 ? '' : 's'}`;
+      riskCountLabel.textContent = `${data.risk_alerts.length} alert${data.risk_alerts.length === 1 ? '' : 's'}`;
       if (data.risk_alerts.length > 0) {
-        riskRadarContainer.innerHTML = data.risk_alerts.map(alert => `
-          <div class="risk-card risk-${alert.risk_level.toLowerCase()}">
-            <div style="display: flex; justify-content: space-between; font-weight: 700;">
-              <span>⚠️ ${escapeHtml(alert.vendor_name)}</span>
+        riskAlertsContainer.innerHTML = data.risk_alerts.map(alert => `
+          <div class="risk-alert-box ${alert.risk_level.toLowerCase()}">
+            <div style="display: flex; justify-content: space-between; font-weight: 600;">
+              <span>${escapeHtml(alert.vendor_name)}</span>
               <span>Level: ${alert.risk_level}</span>
             </div>
-            <div style="font-weight: 600; margin-top: 2px;">${escapeHtml(alert.risk_factor)}</div>
-            <div style="font-size: 0.75rem; margin-top: 2px;">${escapeHtml(alert.reason)}</div>
+            <div style="font-weight: 500; margin-top: 2px;">${escapeHtml(alert.risk_factor)}</div>
+            <div style="margin-top: 2px; opacity: 0.9;">${escapeHtml(alert.reason)}</div>
           </div>
         `).join('');
       } else {
-        riskRadarContainer.innerHTML = `<div style="text-align: center; color: #34d399; padding: 14px;">✓ All quotes passed compliance checks.</div>`;
+        riskAlertsContainer.innerHTML = `<div style="text-align: center; color: var(--success-text); padding: 14px; font-size: 12px;">Zero compliance flags identified.</div>`;
       }
 
     } catch (err) {
@@ -371,9 +371,9 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ---------------------------------------------------------
-  // Negotiation Action Trigger
+  // Negotiation Action
   // ---------------------------------------------------------
-  btnTriggerNegotiationDemo.addEventListener('click', async () => {
+  btnRunNegotiation.addEventListener('click', async () => {
     try {
       const payload = {
         procurement_id: "PROC-2026-001",
@@ -402,50 +402,50 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderNegotiations(threads) {
     if (!threads || threads.length === 0) {
-      negotiationsContainer.innerHTML = `<div style="color: var(--text-muted); text-align: center; padding: 14px; font-size: 0.8rem;">No active negotiation rounds.</div>`;
+      negotiationsListContainer.innerHTML = `<div style="color: var(--text-muted); text-align: center; padding: 14px; font-size: 12px;">No active negotiations.</div>`;
       return;
     }
 
-    negotiationsContainer.innerHTML = threads.map(t => `
-      <div style="background: rgba(12, 17, 28, 0.5); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px 14px; margin-bottom: 8px;">
+    negotiationsListContainer.innerHTML = threads.map(t => `
+      <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 8px;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-          <div style="font-weight: 700; color: var(--text-main); font-size: 0.86rem;">
-            🤝 ${escapeHtml(t.vendor_name)}
+          <div style="font-weight: 600; color: var(--text-primary); font-size: 13px;">
+            ${escapeHtml(t.vendor_name)}
           </div>
-          <span style="background: rgba(16, 185, 129, 0.15); color: #34d399; font-size: 0.7rem; font-weight: 700; padding: 2px 7px; border-radius: 9999px;">
+          <span class="tag-badge approved">
             +${formatINR(t.savings_achieved)} Concession
           </span>
         </div>
-        <div style="font-size: 0.74rem; color: var(--text-secondary); margin-top: 4px;">
-          Initial: <strike>${formatINR(t.initial_price)}</strike> ➔ Improved: <b style="color: #34d399;">${formatINR(t.current_price)}</b>
+        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
+          Initial Quote: <strike>${formatINR(t.initial_price)}</strike> ➔ Conceded: <b style="color: var(--success-text); font-family: var(--font-mono);">${formatINR(t.current_price)}</b>
         </div>
       </div>
     `).join('');
   }
 
   // ---------------------------------------------------------
-  // Executive Reports Preview
+  // Reports
   // ---------------------------------------------------------
-  btnViewComparisonReport.addEventListener('click', async () => {
+  btnOpenCompReport.addEventListener('click', async () => {
     try {
       const res = await fetch('/reports/comparison');
       if (!res.ok) return;
       const md = await res.text();
-      document.getElementById('report-modal-title').textContent = 'Vendor Comparison Report';
-      document.getElementById('report-modal-body').textContent = md;
+      document.getElementById('report-modal-heading').textContent = 'Vendor Comparison Report';
+      document.getElementById('report-modal-content').textContent = md;
       reportModal.classList.add('open');
     } catch (err) {
       console.error('Error fetching report:', err);
     }
   });
 
-  btnViewNegotiationReport.addEventListener('click', async () => {
+  btnOpenNegReport.addEventListener('click', async () => {
     try {
       const res = await fetch('/reports/negotiation');
       if (!res.ok) return;
       const md = await res.text();
-      document.getElementById('report-modal-title').textContent = 'Negotiation Intelligence Report';
-      document.getElementById('report-modal-body').textContent = md;
+      document.getElementById('report-modal-heading').textContent = 'Negotiation Intelligence Report';
+      document.getElementById('report-modal-content').textContent = md;
       reportModal.classList.add('open');
     } catch (err) {
       console.error('Error fetching report:', err);
@@ -464,60 +464,60 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('modal-ticket-id').textContent = ticket.id;
       document.getElementById('modal-ticket-title').textContent = ticket.title;
 
-      const quotesHtml = (ticket.quotes || []).map(q => `
-        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-          <td style="padding: 8px 10px; font-weight: 600;">
-            ${q.is_recommended ? '⭐ ' : ''}${escapeHtml(q.vendor_name)}
+      const quotesRows = (ticket.quotes || []).map(q => `
+        <tr style="border-bottom: 1px solid var(--border-subtle);">
+          <td style="padding: 8px 10px; font-weight: 500;">
+            ${escapeHtml(q.vendor_name)} ${q.is_recommended ? '<span class="tag-badge approved" style="margin-left: 4px;">Top Pick</span>' : ''}
           </td>
-          <td style="padding: 8px 10px; color: #34d399; font-weight: 700;">${formatINR(q.price)}</td>
+          <td style="padding: 8px 10px; color: var(--success-text); font-family: var(--font-mono);">${formatINR(q.price)}</td>
           <td style="padding: 8px 10px;">${q.delivery_days} Days</td>
           <td style="padding: 8px 10px;">${q.warranty_years} Yrs</td>
-          <td style="padding: 8px 10px; color: #34d399;">${q.savings_percentage > 0 ? `+${q.savings_percentage}%` : 'Standard'}</td>
+          <td style="padding: 8px 10px; color: var(--success-text);">${q.savings_percentage > 0 ? `+${q.savings_percentage}%` : 'Standard'}</td>
         </tr>
       `).join('');
 
-      const content = document.getElementById('modal-ticket-content');
+      const content = document.getElementById('modal-ticket-body');
       content.innerHTML = `
-        <div style="background: rgba(0,0,0,0.3); padding: 14px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle); margin-bottom: 16px;">
-          <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Executive Summary</div>
-          <div style="font-size: 0.85rem; margin-top: 2px; color: var(--text-main);">${escapeHtml(ticket.summary || 'Summary unavailable')}</div>
+        <div style="background: var(--bg-surface); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); margin-bottom: 16px;">
+          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Executive Summary</div>
+          <div style="font-size: 13px; margin-top: 2px; color: var(--text-primary);">${escapeHtml(ticket.summary || 'Summary unavailable')}</div>
         </div>
 
-        <div style="font-weight: 700; font-size: 0.9rem; margin-bottom: 8px;">Vendor Bids Comparison</div>
-        <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-bottom: 16px;">
+        <div style="font-weight: 600; font-size: 13px; margin-bottom: 8px;">Vendor Quotations Matrix</div>
+        <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 16px;">
           <thead>
             <tr style="color: var(--text-muted); border-bottom: 1px solid var(--border-subtle); text-align: left;">
-              <th style="padding: 6px 10px;">Vendor</th>
+              <th style="padding: 6px 10px;">Supplier</th>
               <th style="padding: 6px 10px;">Quoted Price</th>
-              <th style="padding: 6px 10px;">Timeline</th>
+              <th style="padding: 6px 10px;">Delivery</th>
               <th style="padding: 6px 10px;">Warranty</th>
               <th style="padding: 6px 10px;">Savings</th>
             </tr>
           </thead>
           <tbody>
-            ${quotesHtml || '<tr><td colspan="5">No vendor quotes recorded</td></tr>'}
+            ${quotesRows || '<tr><td colspan="5" style="padding: 8px 10px; color: var(--text-muted);">No quotes on file</td></tr>'}
           </tbody>
         </table>
 
         ${ticket.status === 'Approval Pending' ? `
-          <div style="display: flex; gap: 10px; margin-top: 18px; border-top: 1px solid var(--border-subtle); padding-top: 16px;">
-            <button class="btn btn-success btn-sm" style="flex: 1;" id="modal-btn-approve">
-              ✓ Approve (${formatINR(ticket.recommended_price)})
+          <div style="display: flex; gap: 8px; margin-top: 16px; border-top: 1px solid var(--border-subtle); padding-top: 14px;">
+            <button class="btn btn-success btn-sm" style="flex: 1;" id="modal-action-approve">
+              Approve (${formatINR(ticket.recommended_price)})
             </button>
-            <button class="btn btn-danger btn-sm" style="flex: 1;" id="modal-btn-reject">
-              ✕ Reject
+            <button class="btn btn-danger btn-sm" style="flex: 1;" id="modal-action-reject">
+              Reject Request
             </button>
           </div>
         ` : ''}
       `;
 
       if (ticket.status === 'Approval Pending') {
-        document.getElementById('modal-btn-approve')?.addEventListener('click', async () => {
-          await handleApprovalAction(ticket.id, 'approve');
+        document.getElementById('modal-action-approve')?.addEventListener('click', async () => {
+          await handleApproval(ticket.id, 'approve');
           ticketModal.classList.remove('open');
         });
-        document.getElementById('modal-btn-reject')?.addEventListener('click', async () => {
-          await handleApprovalAction(ticket.id, 'reject');
+        document.getElementById('modal-action-reject')?.addEventListener('click', async () => {
+          await handleApproval(ticket.id, 'reject');
           ticketModal.classList.remove('open');
         });
       }
@@ -529,45 +529,45 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ---------------------------------------------------------
-  // Handle Approval / Rejection API Actions
+  // Approval Action
   // ---------------------------------------------------------
-  async function handleApprovalAction(ticketId, action) {
+  async function handleApproval(ticketId, action) {
     try {
       const endpoint = action === 'approve' ? `/procurement/${ticketId}/approve` : `/procurement/${ticketId}/reject`;
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ approver: 'Manager', channel: 'web' })
+        body: JSON.stringify({ approver: 'Authorized Manager', channel: 'web' })
       });
       if (res.ok) {
-        await loadDashboardData();
-        appendChatBubble('agent', `⚡ Action processed: Ticket ${ticketId} has been ${action === 'approve' ? 'APPROVED' : 'REJECTED'}.`);
+        await loadDashboard();
+        appendChatMsg('agent', `Order ${ticketId} has been ${action === 'approve' ? 'APPROVED' : 'REJECTED'}.`);
       }
     } catch (err) {
-      console.error('Error handling approval action:', err);
+      console.error('Error in approval action:', err);
     }
   }
 
   // ---------------------------------------------------------
-  // Channel Simulator Interaction
+  // Channel Interface Simulator
   // ---------------------------------------------------------
-  simTabTelegram.addEventListener('click', () => {
+  channelBtnTg.addEventListener('click', () => {
     state.activeSimChannel = 'telegram';
-    simTabTelegram.classList.add('active', 'telegram');
-    simTabEmail.classList.remove('active', 'email');
-    chatInput.placeholder = "Type Telegram message (e.g. 'Need 100 laptops.')...";
+    channelBtnTg.classList.add('active');
+    channelBtnEmail.classList.remove('active');
+    chatInput.placeholder = "Enter Telegram message...";
   });
 
-  simTabEmail.addEventListener('click', () => {
+  channelBtnEmail.addEventListener('click', () => {
     state.activeSimChannel = 'email';
-    simTabEmail.classList.add('active', 'email');
-    simTabTelegram.classList.remove('active', 'telegram');
-    chatInput.placeholder = "Type Email message...";
+    channelBtnEmail.classList.add('active');
+    channelBtnTg.classList.remove('active');
+    chatInput.placeholder = "Enter Email requirement...";
   });
 
-  quickChips.forEach(chip => {
-    chip.addEventListener('click', () => {
-      chatInput.value = chip.dataset.text;
+  hintPills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      chatInput.value = pill.dataset.text;
       chatInput.focus();
     });
   });
@@ -578,7 +578,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!text) return;
 
     chatInput.value = '';
-    appendChatBubble('user', text);
+    appendChatMsg('user', text);
 
     try {
       const res = await fetch('/api/channels/simulate-message', {
@@ -596,30 +596,30 @@ document.addEventListener('DOMContentLoaded', () => {
         const data = await res.json();
         
         if (data.status === 'in_progress') {
-          appendChatBubble('agent', data.reply);
+          appendChatMsg('agent', data.reply);
         } else if (data.status === 'ticket_created') {
           const t = data.ticket;
           const msg = `
-            🎉 <b>Procurement Created: <span style="color: var(--primary-light);">${t.id}</span></b><br>
-            📦 <b>Item:</b> ${t.quantity}x ${t.product}<br>
-            💰 <b>Budget:</b> ${formatINR(t.budget)}<br>
-            🏢 <b>Recommended:</b> ${t.recommended_vendor} (${formatINR(t.recommended_price)})<br><br>
-            <i>Approve or Reject?</i>
-            <div style="display: flex; gap: 8px; margin-top: 8px;">
-              <button class="btn btn-success btn-sm btn-sim-approve" data-id="${t.id}">Approve</button>
-              <button class="btn btn-danger btn-sm btn-sim-reject" data-id="${t.id}">Reject</button>
+            <b>Procurement Ticket Generated: ${t.id}</b><br>
+            • Item: ${t.quantity}x ${t.product}<br>
+            • Budget: ${formatINR(t.budget)}<br>
+            • Recommended: ${t.recommended_vendor} (${formatINR(t.recommended_price)})<br><br>
+            <i>Authorize this procurement?</i>
+            <div style="display: flex; gap: 6px; margin-top: 8px;">
+              <button class="btn btn-success btn-sm btn-sim-appr" data-id="${t.id}">Approve</button>
+              <button class="btn btn-danger btn-sm btn-sim-rej" data-id="${t.id}">Reject</button>
             </div>
           `;
-          appendChatBubble('agent', msg, true);
+          appendChatMsg('agent', msg, true);
 
           setTimeout(() => {
-            document.querySelectorAll('.btn-sim-approve').forEach(b => {
+            document.querySelectorAll('.btn-sim-appr').forEach(b => {
               b.onclick = () => {
                 chatInput.value = `APPROVE ${b.dataset.id}`;
                 chatForm.dispatchEvent(new Event('submit'));
               };
             });
-            document.querySelectorAll('.btn-sim-reject').forEach(b => {
+            document.querySelectorAll('.btn-sim-rej').forEach(b => {
               b.onclick = () => {
                 chatInput.value = `REJECT ${b.dataset.id}`;
                 chatForm.dispatchEvent(new Event('submit'));
@@ -627,73 +627,68 @@ document.addEventListener('DOMContentLoaded', () => {
             });
           }, 100);
 
-          await loadDashboardData();
+          await loadDashboard();
         } else if (data.status === 'approval_processed') {
-          appendChatBubble('agent', data.reply);
-          await loadDashboardData();
+          appendChatMsg('agent', data.reply);
+          await loadDashboard();
         } else {
-          appendChatBubble('agent', data.reply || 'Message processed.');
+          appendChatMsg('agent', data.reply || 'Request received.');
         }
       }
     } catch (err) {
-      appendChatBubble('agent', '⚠️ Error connecting to server.');
-      console.error('Simulator error:', err);
+      appendChatMsg('agent', 'Connection error to procurement service.');
     }
   });
 
-  function appendChatBubble(sender, text, isHtml = false) {
-    const bubble = document.createElement('div');
-    bubble.className = `chat-msg ${sender}`;
-    const tag = sender === 'agent' ? `<div style="font-size: 0.7rem; font-weight: 700; color: var(--primary-light); margin-bottom: 2px;">🤖 Caspian (${state.activeSimChannel.toUpperCase()})</div>` : '';
+  function appendChatMsg(sender, text, isHtml = false) {
+    const el = document.createElement('div');
+    el.className = `chat-entry ${sender}`;
+    const header = sender === 'agent' ? `<div style="font-size: 11px; font-weight: 600; color: var(--primary-text); margin-bottom: 2px;">Procurement Assistant (${state.activeSimChannel.toUpperCase()})</div>` : '';
 
-    bubble.innerHTML = `
-      ${tag}
-      <div>${isHtml ? text : escapeHtml(text).replace(/\n/g, '<br>')}</div>
-    `;
-
-    chatStream.appendChild(bubble);
+    el.innerHTML = `${header}<div>${isHtml ? text : escapeHtml(text).replace(/\n/g, '<br>')}</div>`;
+    chatStream.appendChild(el);
     chatStream.scrollTop = chatStream.scrollHeight;
-    return bubble;
+    return el;
   }
 
   // ---------------------------------------------------------
-  // Filter & Search Controls
+  // Filters & Search
   // ---------------------------------------------------------
-  filterTabs.querySelectorAll('.filter-pill').forEach(pill => {
-    pill.addEventListener('click', () => {
-      filterTabs.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
-      pill.classList.add('active');
-      state.activeStatusFilter = pill.dataset.status;
+  filterTabs.querySelectorAll('.filter-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      filterTabs.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      state.activeStatusFilter = chip.dataset.status;
       fetchProcurements();
     });
   });
 
-  let searchDebounce = null;
-  searchInput.addEventListener('input', (e) => {
-    clearTimeout(searchDebounce);
-    searchDebounce = setTimeout(() => {
+  let debounceTimer = null;
+  searchQuery.addEventListener('input', (e) => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
       state.searchQuery = e.target.value.trim();
       fetchProcurements();
-    }, 250);
+    }, 200);
   });
 
   // ---------------------------------------------------------
   // Create Modal
   // ---------------------------------------------------------
-  btnOpenCreateModal.addEventListener('click', () => createModal.classList.add('open'));
-  btnCloseCreateModal.addEventListener('click', () => createModal.classList.remove('open'));
+  btnOpenCreate.addEventListener('click', () => createModal.classList.add('open'));
+  btnCloseCreate.addEventListener('click', () => createModal.classList.remove('open'));
   btnCancelCreate.addEventListener('click', () => createModal.classList.remove('open'));
-  btnCloseTicketModal.addEventListener('click', () => ticketModal.classList.remove('open'));
-  btnCloseReportModal.addEventListener('click', () => reportModal.classList.remove('open'));
+  btnCloseTicket.addEventListener('click', () => ticketModal.classList.remove('open'));
+  btnCloseReport.addEventListener('click', () => reportModal.classList.remove('open'));
 
-  formCreateProcurement.addEventListener('submit', async (e) => {
+  formCreate.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const product = document.getElementById('create-product').value;
-    const quantity = parseInt(document.getElementById('create-quantity').value);
-    const budget = parseFloat(document.getElementById('create-budget').value);
-    const delivery_days = parseInt(document.getElementById('create-delivery').value);
-    const channel = document.getElementById('create-channel').value;
-    const specsRaw = document.getElementById('create-specs').value;
+    const product = document.getElementById('inp-product').value;
+    const quantity = parseInt(document.getElementById('inp-qty').value);
+    const budget = parseFloat(document.getElementById('inp-budget').value);
+    const delivery_days = parseInt(document.getElementById('inp-delivery').value);
+    const channel = document.getElementById('inp-channel').value;
+    const specsRaw = document.getElementById('inp-specs').value;
 
     const specifications = specsRaw ? specsRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
 
@@ -712,12 +707,12 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       if (res.ok) {
-        formCreateProcurement.reset();
+        formCreate.reset();
         createModal.classList.remove('open');
-        await loadDashboardData();
+        await loadDashboard();
       }
     } catch (err) {
-      console.error('Error creating procurement:', err);
+      console.error('Error creating ticket:', err);
     }
   });
 
@@ -738,7 +733,7 @@ document.addEventListener('DOMContentLoaded', () => {
       .replace(/'/g, '&#039;');
   }
 
-  // Initial Load & Auto-polling
-  loadDashboardData();
-  setInterval(loadDashboardData, 10000);
+  // Init
+  loadDashboard();
+  setInterval(loadDashboard, 10000);
 });
