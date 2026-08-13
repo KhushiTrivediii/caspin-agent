@@ -1,29 +1,9 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-.venv/
-
-# Environment Variables
-.env
-!.env.example
-
-# Databases
 *.db
 *.sqlite
 *.sqlite3
-
-# IDE / OS
-.vscode/
+__pycache__/
+*.pyc
+.env
 .idea/
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-logs/
+.vscode/
+scratch/

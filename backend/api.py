@@ -1,502 +1,241 @@
-import aiosqlite
+import logging
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import PlainTextResponse, HTMLResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse
 
 from backend.models import (
-    ProcurementTicket,
-    CreateProcurementRequest,
-    ApprovalActionRequest,
-    SimulateMessageRequest,
-    AdvanceStageRequest,
-    ChannelMessage,
-    AuditLog,
-    ProcurementRequirement,
-    ProcurementStatus,
+    IncidentTicket,
+    MessageLog,
+    SimulationRequest,
+    BriefingPayload,
+    SettingsUpdate,
+    IncidentCategory,
+    TicketStatus,
     ChannelType,
-    VendorProfile,
-    VendorSearchRequest,
-    QuoteAnalyzeRequest,
-    QuotationAnalysisResult,
-    VendorScoreRequest,
-    VendorScoreResult,
-    NegotiationRequest,
-    NegotiationThread,
-    RecommendationRequest,
-    SupplierRecommendation,
-    PurchaseOrder,
-    ManualQuoteInput,
-    VendorQuote,
 )
 from backend.database import (
-    list_procurements,
-    get_procurement,
-    get_next_procurement_id,
-    create_procurement,
-    record_approval_decision,
-    get_audit_logs,
+    list_tickets,
+    get_ticket,
+    create_ticket,
+    get_graph_data,
+    get_kpi_stats,
+    get_settings,
+    update_setting,
     get_channel_messages,
-    get_dashboard_stats,
-    list_vendors,
-    list_negotiations,
-    save_purchase_order,
-    get_purchase_order,
-    add_vendor_quote_to_db,
+    get_audit_logs,
+    log_audit_action,
 )
-from backend.ai_engine import ai_engine
 from backend.workflow_manager import workflow_manager
 from backend.caspian_service import caspian_service
-from backend.vendor_intelligence import vendor_intelligence
 
 router = APIRouter()
+logger = logging.getLogger("api")
 
 
-# ---------------------------------------------------------
-# Core Procurement Endpoints
-# ---------------------------------------------------------
-
-@router.get("/procurements", response_model=List[ProcurementTicket])
-async def get_all_procurements(
-    status: Optional[str] = Query(None, description="Filter by status (e.g. Open, Approval Pending, Approved, Completed)"),
-    channel: Optional[str] = Query(None, description="Filter by channel (telegram, email, web)"),
-    search: Optional[str] = Query(None, description="Search term for product, ID, requester"),
-    limit: int = Query(50, ge=1, le=100),
+@router.get("/tickets", response_model=List[IncidentTicket])
+async def get_all_tickets(
+    category: Optional[str] = Query(None, description="Filter by category"),
+    status: Optional[str] = Query(None, description="Filter by status"),
 ):
-    """Retrieve list of all procurement tickets with optional filters."""
-    return await list_procurements(status=status, channel=channel, search=search, limit=limit)
+    """Retrieve list of all active incident tickets."""
+    return await list_tickets(category=category, status=status)
 
 
-@router.get("/procurement/{procurement_id}", response_model=ProcurementTicket)
-async def get_procurement_by_id(procurement_id: str):
-    """Get single procurement ticket with quotes, approval details, and specifications."""
-    ticket = await get_procurement(procurement_id)
+@router.get("/ticket/{ticket_id}", response_model=IncidentTicket)
+async def get_ticket_by_id(ticket_id: str):
+    """Retrieve ticket details with description and current assignee."""
+    ticket = await get_ticket(ticket_id)
     if not ticket:
-        raise HTTPException(status_code=404, detail=f"Procurement ticket '{procurement_id}' not found.")
+        raise HTTPException(status_code=404, detail="Incident ticket not found.")
     return ticket
 
 
-@router.post("/procurement", response_model=ProcurementTicket)
-async def create_new_procurement(payload: CreateProcurementRequest):
-    """Directly create a new structured procurement ticket and run automated vendor evaluation."""
-    ticket_id = await get_next_procurement_id()
-    req = ProcurementRequirement(
-        product=payload.product,
-        quantity=payload.quantity,
-        budget=payload.budget,
-        currency=payload.currency,
-        delivery_days=payload.delivery_days,
-        specifications=payload.specifications,
-        requester_name=payload.requester_name,
-        requester_email=payload.requester_email,
-        channel=payload.channel,
+@router.get("/ticket/{ticket_id}/audit")
+async def get_ticket_audit_trail(ticket_id: str):
+    """Get audit trail logs for an incident ticket."""
+    return await get_audit_logs(ticket_id)
+
+
+@router.get("/graph")
+async def get_memory_graph():
+    """Retrieve nodes and edges for Neo4j memory visualization."""
+    return await get_graph_data()
+
+
+@router.get("/stats")
+async def get_dashboard_kpis():
+    """Retrieve KPI metrics for operations overview."""
+    return await get_kpi_stats()
+
+
+@router.get("/logs", response_model=List[MessageLog])
+async def get_all_message_logs(ticket_id: Optional[str] = None):
+    """Retrieve all inbound/outbound communication logs."""
+    return await get_channel_messages(ticket_id=ticket_id)
+
+
+@router.get("/settings")
+async def get_system_settings():
+    """Retrieve current system settings."""
+    return await get_settings()
+
+
+@router.post("/settings")
+async def update_system_settings(payload: SettingsUpdate):
+    """Toggle Founder Disappears Mode or other configuration flags."""
+    await update_setting("founder_disappears_mode", "1" if payload.founder_disappears_mode else "0")
+    logger.info(f"Updated setting: founder_disappears_mode = {payload.founder_disappears_mode}")
+    
+    # Send confirmation message to founder on Telegram
+    mode_text = "ENABLED 🟢 (Autonomous Workflows Active)" if payload.founder_disappears_mode else "DISABLED 🔴 (Approval Alerts Enabled)"
+    briefing_text = (
+        f"⚙️ *BLACKBOX System Update:*\n"
+        f"Founder Disappears Mode is now *{mode_text}*."
     )
-
-    quotes = ai_engine.generate_vendor_quotes(req, ticket_id)
-    recommended_quote = next((q for q in quotes if q.is_recommended), quotes[0] if quotes else None)
-
-    ticket = ProcurementTicket(
-        id=ticket_id,
-        title=f"{req.quantity}x {req.product} Procurement",
-        product=req.product,
-        quantity=req.quantity,
-        budget=req.budget,
-        currency=req.currency,
-        delivery_days=req.delivery_days,
-        specifications=req.specifications,
-        status=ProcurementStatus.APPROVAL_PENDING,
-        current_stage="Approval Pending",
-        requester_name=payload.requester_name,
-        requester_email=payload.requester_email,
-        channel=payload.channel,
-        recommended_vendor=recommended_quote.vendor_name if recommended_quote else None,
-        recommended_price=recommended_quote.price if recommended_quote else req.budget,
-        recommended_delivery_days=recommended_quote.delivery_days if recommended_quote else req.delivery_days,
-        quotes=quotes,
-        summary=f"Created via Direct API. Best bid from {recommended_quote.vendor_name if recommended_quote else 'Vendor'} at {ai_engine.format_currency_inr(recommended_quote.price if recommended_quote else req.budget)}.",
-    )
-
-    created = await create_procurement(ticket)
-    return created
-
-
-@router.post("/procurement/{procurement_id}/approve", response_model=ProcurementTicket)
-async def approve_procurement(procurement_id: str, payload: Optional[ApprovalActionRequest] = None):
-    """Approve a pending procurement recommendation."""
-    ticket = await get_procurement(procurement_id)
-    if not ticket:
-        raise HTTPException(status_code=404, detail=f"Procurement ticket '{procurement_id}' not found.")
-
-    approver = payload.approver if payload else "Executive Approver"
-    channel = payload.channel if payload else "web"
-    notes = payload.notes if payload else "Approved via Dashboard"
-
-    await record_approval_decision(
-        procurement_id=procurement_id,
-        status="APPROVED",
-        approver=approver,
-        channel=channel,
-        notes=notes,
-    )
-
     await caspian_service.send_message(
-        channel=ticket.channel,
-        recipient_id=ticket.requester_id or "user",
-        conversation_id=f"{ticket.channel.value}_{ticket.requester_id or 'default'}",
-        text=f"✅ *Procurement Approved!* [{ticket.id}] for {ticket.quantity}x {ticket.product}. Selected Vendor: {ticket.recommended_vendor}.",
-        procurement_id=ticket.id,
+        channel=ChannelType.TELEGRAM,
+        recipient_id="founder_tg",
+        conversation_id="system_notifications",
+        text=briefing_text,
     )
-
-    return await get_procurement(procurement_id)
-
-
-@router.post("/procurement/{procurement_id}/reject", response_model=ProcurementTicket)
-async def reject_procurement(procurement_id: str, payload: Optional[ApprovalActionRequest] = None):
-    """Reject a procurement recommendation."""
-    ticket = await get_procurement(procurement_id)
-    if not ticket:
-        raise HTTPException(status_code=404, detail=f"Procurement ticket '{procurement_id}' not found.")
-
-    approver = payload.approver if payload else "Executive Approver"
-    channel = payload.channel if payload else "web"
-    notes = payload.notes if payload else "Declined via Dashboard"
-
-    await record_approval_decision(
-        procurement_id=procurement_id,
-        status="REJECTED",
-        approver=approver,
-        channel=channel,
-        notes=notes,
-    )
-
-    await caspian_service.send_message(
-        channel=ticket.channel,
-        recipient_id=ticket.requester_id or "user",
-        conversation_id=f"{ticket.channel.value}_{ticket.requester_id or 'default'}",
-        text=f"❌ *Procurement Declined* [{ticket.id}] for {ticket.quantity}x {ticket.product}.",
-        procurement_id=ticket.id,
-    )
-
-    return await get_procurement(procurement_id)
+    return {"status": "success", "settings": await get_settings()}
 
 
-@router.post("/procurement/{procurement_id}/advance-stage", response_model=ProcurementTicket)
-async def advance_stage(procurement_id: str, payload: AdvanceStageRequest):
-    """Advance procurement ticket to specified workflow stage."""
-    updated = await workflow_manager.advance_stage(procurement_id, payload.stage)
-    if not updated:
-        raise HTTPException(status_code=404, detail=f"Procurement ticket '{procurement_id}' not found.")
-    return updated
-
-
-# ---------------------------------------------------------
-# Vendor Intelligence Engine APIs (Required 8 & 9)
-# ---------------------------------------------------------
-
-@router.get("/vendors", response_model=List[VendorProfile])
-async def get_vendor_directory(
-    category: Optional[str] = Query(None),
-    search: Optional[str] = Query(None),
-):
-    """List all registered vendors from the enterprise supplier directory."""
-    return await list_vendors(category=category, search=search)
-
-
-@router.post("/vendors/search", response_model=List[VendorProfile])
-async def search_vendors_endpoint(payload: VendorSearchRequest):
+@router.post("/simulate")
+async def trigger_simulation_endpoint(payload: SimulationRequest):
     """
-    1. Vendor Discovery Agent API:
-    Search vendor database & external catalogs matching product specifications and budget.
+    Main Hackathon Judge Simulation runner.
+    Triggers simulated inbound channel messages for the 5 demo cases.
     """
-    vendors = await vendor_intelligence.discover_vendors(
-        product=payload.product,
-        quantity=payload.quantity,
-        budget=payload.budget,
-        category=payload.category,
-    )
-    return vendors
+    sim_type = payload.type.lower()
+    logger.info(f"Simulating event: {sim_type}")
+    
+    if sim_type == "support":
+        # Demo 1: Customer email arrives
+        result = await workflow_manager.handle_inbound_message(
+            channel=ChannelType.EMAIL,
+            sender_id="client_alex",
+            sender_name="Alex Mercer",
+            sender_email="alex@mercer.com",
+            text="Hi support, I still haven't received my refund for the order cancellation. Can you check this?",
+        )
+        return {"status": "success", "result": result}
+    elif sim_type == "lead":
+        # Demo lead email reply or follow-up
+        result = await workflow_manager.handle_inbound_message(
+            channel=ChannelType.EMAIL,
+            sender_id="lead_tesla",
+            sender_name="Tesla Corporate Procurement",
+            sender_email="procurement@tesla.com",
+            text="Interested in your enterprise task automation solution. Let's set up a time.",
+        )
+        return {"status": "success", "result": result}
+        
+    elif sim_type == "blocker":
+        # Demo 2: Slack blocker detected
+        result = await workflow_manager.handle_inbound_message(
+            channel=ChannelType.SLACK,
+            sender_id="dev_bob",
+            sender_name="Bob (Backend)",
+            text="🚨 BLOCKER: Payments System Gateway is down! Out of memory error. Database connection pool exhausted.",
+        )
+        return {"status": "success", "result": result}
+        
+    elif sim_type == "bug":
+        # Demo 3: Discord community bug report
+        result = await workflow_manager.handle_inbound_message(
+            channel=ChannelType.DISCORD,
+            sender_id="sarah_discord",
+            sender_name="Sarah Chen",
+            text="Hey team, there is a bug on the checkout page. The system throws a 404 error when selecting domestic cards.",
+        )
+        return {"status": "success", "result": result}
+        
+    elif sim_type == "delay":
+        # Demo 4: Vendor WhatsApp delay message
+        result = await workflow_manager.handle_inbound_message(
+            channel=ChannelType.WHATSAPP,
+            sender_id="vendor_dhl",
+            sender_name="DHL Express Logistics",
+            text="Update: Shipment VND-9988 for Payments System Gateway hardware is delayed outside Bangalore due to heavy rains.",
+        )
+        return {"status": "success", "result": result}
+        
+    elif sim_type == "briefing":
+        # Demo 5: Founder Daily Briefing
+        stats = await get_kpi_stats()
+        briefing_text = (
+            f"📊 *BLACKBOX Founder Daily Briefing*\n"
+            f"Good morning! Startup operations summary:\n\n"
+            f"💼 *Revenue Opportunities:* {stats['opportunities']} Active Leads\n"
+            f"⚠️ *Customer Risks:* {stats['risks']} Escalated Tickets\n"
+            f"📋 *Open Issues:* {stats['issues']} Active Work Tasks\n"
+            f"📦 *Vendor Delays:* {stats['delays']} Delayed Shipments\n"
+            f"📅 *Meetings Today:* {stats['meetings']} Confirmed Appointments\n\n"
+            f"BLACKBOX is running fully autonomously. No actions required."
+        )
+        msg = await caspian_service.send_message(
+            channel=ChannelType.TELEGRAM,
+            recipient_id="founder_tg",
+            conversation_id="daily_briefing",
+            text=briefing_text,
+        )
+        return {"status": "success", "message_id": msg.id}
+
+    elif sim_type == "escalate":
+        # Escalation trigger for unresolved bugs
+        tickets = await list_tickets(status=TicketStatus.OPEN.value)
+        unresolved_bug = next((t for t in tickets if t.category == IncidentCategory.COMMUNITY_INTELLIGENCE), None)
+        if unresolved_bug:
+            escalation_text = (
+                f"⚠️ *SLA ESCALATION* [{unresolved_bug.id}]\n\n"
+                f"The Discord community bug report '{unresolved_bug.description}' has been unresolved for 2 hours.\n"
+                f"Would you like to assign this to Alice (DevOps) or Bob (Backend)?"
+            )
+            buttons_list = [
+                {"text": "Assign Alice", "value": f"ASSIGN dev_alice {unresolved_bug.id}"},
+                {"text": "Assign Bob", "value": f"ASSIGN dev_bob {unresolved_bug.id}"},
+            ]
+            msg = await caspian_service.send_message(
+                channel=ChannelType.TELEGRAM,
+                recipient_id="founder_tg",
+                conversation_id=f"esc_{unresolved_bug.id}",
+                text=escalation_text,
+                ticket_id=unresolved_bug.id,
+                buttons_list=buttons_list,
+            )
+            await log_audit_action(unresolved_bug.id, "SLA_ESCALATED", "BLACKBOX", "SLA breached. Escalated incident to Founder.")
+            await update_ticket_status(unresolved_bug.id, TicketStatus.ESCALATED)
+            return {"status": "success", "message_id": msg.id}
+        else:
+            raise HTTPException(status_code=400, detail="No active community bug tickets found to escalate.")
+            
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown simulation type '{sim_type}'.")
 
 
-@router.post("/quotes/analyze", response_model=QuotationAnalysisResult)
-async def analyze_quotes_endpoint(payload: QuoteAnalyzeRequest):
+@router.post("/channels/{channel}/inbound")
+async def unified_channel_inbound_endpoint(channel: str, payload: Dict[str, Any]):
     """
-    2. Quotation Analysis Agent API:
-    Accept multiple quotations, normalize metrics, generate comparison table,
-    and evaluate price deviations.
-    """
-    result = vendor_intelligence.analyze_quotations(
-        product=payload.product,
-        quantity=payload.quantity,
-        budget=payload.budget,
-        quotes=payload.quotes,
-    )
-    return result
-
-
-@router.post("/vendors/score", response_model=List[VendorScoreResult])
-async def score_vendors_endpoint(payload: VendorScoreRequest):
-    """
-    3. Vendor Scoring Engine API:
-    Calculate composite score using:
-    40% Price, 25% Delivery, 20% Reliability, 15% Warranty.
-    """
-    scores = vendor_intelligence.score_vendors(
-        budget=payload.budget,
-        quotes=payload.quotes,
-        target_delivery_days=payload.target_delivery_days or 10,
-    )
-    return scores
-
-
-@router.post("/vendors/negotiate", response_model=NegotiationThread)
-async def negotiate_vendor_endpoint(payload: NegotiationRequest):
-    """
-    4. Negotiation Agent API:
-    Generate counter-offer negotiation email automatically, track status
-    (Sent -> Replied -> Improved Offer), and calculate savings achieved.
-    """
-    thread = await vendor_intelligence.create_and_send_negotiation(
-        vendor_name=payload.vendor_name,
-        initial_price=payload.initial_price,
-        competing_lower_price=payload.competing_lower_price,
-        target_discount_pct=payload.target_discount_percentage,
-        product_name=payload.product_name or "Laptop",
-        quantity=payload.quantity or 100,
-        vendor_email=payload.vendor_email,
-        procurement_id=payload.procurement_id or "PROC-2026-001",
-    )
-    return thread
-
-
-@router.post("/vendors/recommend", response_model=SupplierRecommendation)
-async def recommend_vendor_endpoint(payload: RecommendationRequest):
-    """
-    6. Recommendation Engine API:
-    Synthesize scores, risk flags, and delivery capabilities to output
-    the optimal supplier recommendation with justifications.
+    Unified inbound gateway. Routes live webhook triggers to the workflow manager.
     """
     try:
-        rec = vendor_intelligence.recommend_supplier(
-            product=payload.product,
-            quantity=payload.quantity,
-            budget=payload.budget,
-            quotes=payload.quotes,
+        from backend.models import ChannelType
+        sender_id = payload.get("sender_id", "unknown_user")
+        sender_name = payload.get("sender_name", "Unknown User")
+        sender_email = payload.get("sender_email")
+        text = payload.get("text", "")
+        conversation_id = payload.get("conversation_id")
+        
+        result = await workflow_manager.handle_inbound_message(
+            channel=ChannelType(channel),
+            sender_id=sender_id,
+            sender_name=sender_name,
+            sender_email=sender_email,
+            conversation_id=conversation_id,
+            text=text,
         )
-        return rec
+        return result
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.get("/negotiations", response_model=List[NegotiationThread])
-async def get_negotiations_endpoint(procurement_id: Optional[str] = None):
-    """List ongoing and completed negotiation threads."""
-    return await list_negotiations(procurement_id=procurement_id)
-
-
-# ---------------------------------------------------------
-# Executive Reporting Engine Endpoints (Feature 7)
-# ---------------------------------------------------------
-
-@router.get("/reports/comparison", response_class=PlainTextResponse)
-async def get_comparison_report(
-    product: str = "Laptop",
-    quantity: int = 100,
-    budget: float = 4500000.0,
-):
-    """Generate and download Vendor Comparison Markdown Report."""
-    from backend.models import QuotationInput
-    sample_quotes = [
-        QuotationInput(vendor_name="Dell Partner (Enterprise Solutions)", price=4150000.0, delivery_days=7, warranty_years=3, vendor_rating=4.8, reliability_score=96.0),
-        QuotationInput(vendor_name="HP Commercial Direct", price=4320000.0, delivery_days=9, warranty_years=3, vendor_rating=4.6, reliability_score=92.0),
-        QuotationInput(vendor_name="Lenovo Premier Solutions", price=4400000.0, delivery_days=8, warranty_years=3, vendor_rating=4.5, reliability_score=90.0),
-    ]
-    report = vendor_intelligence.generate_vendor_comparison_report(
-        product=product,
-        quantity=quantity,
-        budget=budget,
-        quotes=sample_quotes,
-    )
-    return report
-
-
-@router.get("/reports/negotiation", response_class=PlainTextResponse)
-async def get_negotiation_report():
-    """Generate and download Negotiation Activity Markdown Report."""
-    threads = await list_negotiations()
-    report = vendor_intelligence.generate_negotiation_report(threads=threads)
-    return report
-
-
-# ---------------------------------------------------------
-# Multi-Channel Simulator & Dashboard Stats
-# ---------------------------------------------------------
-
-@router.post("/api/channels/simulate-message")
-async def simulate_channel_message(payload: SimulateMessageRequest):
-    """
-    Interactive Multi-Channel Simulator endpoint for Telegram & Email.
-    """
-    conversation_id = payload.conversation_id or f"{payload.channel.value}_{payload.sender_id}"
-    result = await workflow_manager.handle_inbound_message(
-        channel=payload.channel,
-        sender_id=payload.sender_id,
-        sender_name=payload.sender_name,
-        sender_email=payload.sender_email,
-        conversation_id=conversation_id,
-        text=payload.text,
-        subject=payload.subject,
-    )
-    return result
-
-
-@router.get("/api/channels/messages", response_model=List[ChannelMessage])
-async def get_messages(
-    conversation_id: Optional[str] = None,
-    procurement_id: Optional[str] = None,
-):
-    """Retrieve message history for active simulation or specific ticket."""
-    return await get_channel_messages(conversation_id=conversation_id, procurement_id=procurement_id)
-
-
-@router.get("/api/stats")
-async def get_stats():
-    """Get KPI summary statistics for the executive dashboard."""
-    return await get_dashboard_stats()
-
-
-@router.get("/api/audit-logs/{procurement_id}", response_model=List[AuditLog])
-async def get_ticket_audit_logs(procurement_id: str):
-    """Get audit trail logs for a procurement ticket."""
-    return await get_audit_logs(procurement_id)
-
-
-# ---------------------------------------------------------
-# New Enterprise PO, Quote Ingestion & Export Endpoints
-# ---------------------------------------------------------
-
-@router.post("/procurement/{id}/quotes", response_model=ProcurementTicket)
-async def ingest_custom_quote(id: str, quote_in: ManualQuoteInput):
-    """
-    Ingest a custom vendor quote, add it to the ticket, and re-run recommendation.
-    """
-    ticket = await get_procurement(id)
-    if not ticket:
-        raise HTTPException(status_code=404, detail="Procurement ticket not found.")
-
-    import uuid
-    from datetime import datetime
-    from backend.po_generator import po_engine
-
-    # Convert ManualQuoteInput to VendorQuote
-    new_quote = VendorQuote(
-        id=f"QUOTE-{uuid.uuid4().hex[:8].upper()}",
-        vendor_name=quote_in.vendor_name,
-        price=quote_in.price,
-        delivery_days=quote_in.delivery_days,
-        warranty_years=quote_in.warranty_years,
-        vendor_rating=quote_in.vendor_rating or 4.5,
-        reliability_score=quote_in.reliability_score or 90.0,
-        specs_matched=ticket.specifications,
-        is_recommended=False,
-        savings_amount=0.0,
-        savings_percentage=0.0,
-    )
-
-    await add_vendor_quote_to_db(id, new_quote)
-
-    # Reload the ticket with all quotes
-    updated_ticket = await get_procurement(id)
-    
-    # Calculate recommended quote
-    from backend.models import QuotationInput
-    scoring_quotes = [
-        QuotationInput(
-            vendor_name=q.vendor_name,
-            price=q.price,
-            delivery_days=q.delivery_days,
-            warranty_years=q.warranty_years,
-            vendor_rating=q.rating,
-            reliability_score=q.reliability_score,
-            specs_matched=q.specs_matched,
-        )
-        for q in updated_ticket.quotes
-    ]
-
-    if scoring_quotes:
-        rec = vendor_intelligence.recommend_supplier(
-            product=updated_ticket.product,
-            quantity=updated_ticket.quantity,
-            budget=updated_ticket.budget,
-            quotes=scoring_quotes,
-        )
-
-        # Update the recommended vendor on the ticket in database
-        async with aiosqlite.connect("./procurements.db") as db:
-            await db.execute(
-                """
-                UPDATE procurements
-                SET recommended_vendor = ?,
-                    recommended_price = ?,
-                    recommended_delivery_days = ?,
-                    summary = ?
-                WHERE id = ?
-                """,
-                (
-                    rec.recommended_vendor,
-                    rec.recommended_price,
-                    rec.recommended_delivery_days or 7,
-                    rec.reasons[1] if len(rec.reasons) > 1 else (rec.reasons[0] if rec.reasons else "Recommendation updated"),
-                    id,
-                ),
-            )
-            # Mark recommended quote in DB
-            await db.execute(
-                "UPDATE vendor_quotes SET is_recommended = 1 WHERE procurement_id = ? AND vendor_name = ?",
-                (id, rec.recommended_vendor),
-            )
-            await db.commit()
-
-    # Return refreshed ticket
-    return await get_procurement(id)
-
-
-@router.get("/procurement/{id}/po", response_model=PurchaseOrder)
-async def get_po_endpoint(id: str):
-    """Retrieve the generated Purchase Order for an approved procurement ticket."""
-    po = await get_purchase_order(id)
-    if not po:
-        raise HTTPException(
-            status_code=404,
-            detail="Purchase Order not found. Ensure the ticket has been approved by the manager to issue a PO."
-        )
-    return po
-
-
-@router.get("/procurement/{id}/po/html", response_class=HTMLResponse)
-async def get_po_html_endpoint(id: str):
-    """Generate and view the formatted, printable corporate Purchase Order document."""
-    po = await get_purchase_order(id)
-    ticket = await get_procurement(id)
-    if not po or not ticket:
-        raise HTTPException(
-            status_code=404,
-            detail="PO or ticket not found. Ensure the ticket is approved."
-        )
-    from backend.po_generator import po_engine
-    return po_engine.generate_po_html(po, ticket)
-
-
-@router.get("/export/procurements/csv", response_class=PlainTextResponse)
-async def export_csv_endpoint():
-    """Export all procurement records as a CSV download."""
-    tickets = await list_procurements(limit=200)
-    from backend.po_generator import po_engine
-    csv_data = po_engine.export_procurements_csv(tickets)
-    return csv_data
-
-
-@router.get("/export/procurements/json", response_model=List[ProcurementTicket])
-async def export_json_endpoint():
-    """Export all procurement records as structured JSON."""
-    tickets = await list_procurements(limit=200)
-    return tickets
-
+        logger.exception(f"Error in unified channel inbound: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

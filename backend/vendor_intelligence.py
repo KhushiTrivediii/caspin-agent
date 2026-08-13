@@ -296,6 +296,148 @@ class VendorIntelligenceEngine:
         logger.info(f"Negotiation with '{vendor_name}' achieved {self._format_currency_inr(savings_achieved)} savings!")
         return thread
 
+    async def respond_to_negotiation(
+        self,
+        negotiation_id: str,
+        strategy: str,  # "AGGRESSIVE", "COLLABORATIVE", or "VALUE_FOCUSED"
+    ) -> NegotiationThread:
+        """
+        Interactive multi-strategy negotiation solver.
+        Adjusts concession pricing based on user's counter-offer strategy.
+        """
+        from backend.database import DB_PATH, list_negotiations
+        import aiosqlite
+
+        async with aiosqlite.connect(DB_PATH) as db:
+            db.row_factory = aiosqlite.Row
+            cursor = await db.execute("SELECT * FROM negotiations WHERE id = ?", (negotiation_id,))
+            row = await cursor.fetchone()
+            if not row:
+                raise ValueError(f"Negotiation thread '{negotiation_id}' not found.")
+
+            initial_price = row["initial_price"]
+            vendor_name = row["vendor_name"]
+            procurement_id = row["procurement_id"]
+
+            if strategy.upper() == "AGGRESSIVE":
+                discount_pct = 7.5
+                vendor_reply = (
+                    f"Dear Enterprise Procurement Team,\n\n"
+                    f"We have reviewed your request for aggressive volume discounts. While our margins are extremely tight, "
+                    f"we can offer a further concession of 7.5% off the initial quote (new price: {self._format_currency_inr(initial_price * 0.925)}) "
+                    f"to secure this order. This is our final best offer.\n\n"
+                    f"Best regards,\n{vendor_name} Sales Director"
+                )
+            elif strategy.upper() == "COLLABORATIVE":
+                discount_pct = 5.0
+                vendor_reply = (
+                    f"Dear Procurement Team,\n\n"
+                    f"Thank you for the collaborative discussion. We appreciate the partnership opportunity and "
+                    f"are willing to meet halfway, reducing our price by 5.0% (new price: {self._format_currency_inr(initial_price * 0.950)}) "
+                    f"to build a long-term business relationship.\n\n"
+                    f"Best regards,\n{vendor_name} Key Accounts Lead"
+                )
+            else:  # VALUE_FOCUSED
+                discount_pct = 3.5
+                vendor_reply = (
+                    f"Dear Partners,\n\n"
+                    f"We understand your focus is on lifetime value. We can lower our price by 3.5% (new price: {self._format_currency_inr(initial_price * 0.965)}) "
+                    f"and, additionally, we will extend our comprehensive hardware warranty from 3 years to 4 years at zero additional charge.\n\n"
+                    f"Best regards,\n{vendor_name} Commercial Director"
+                )
+
+            new_price = round(initial_price * (1.0 - (discount_pct / 100.0)), 2)
+            savings = round(initial_price - new_price, 2)
+            now = datetime.utcnow().isoformat()
+
+            # Update negotiation thread
+            await db.execute(
+                """
+                UPDATE negotiations
+                SET current_price = ?,
+                    vendor_reply_text = ?,
+                    status = ?,
+                    savings_achieved = ?,
+                    replied_at = ?
+                WHERE id = ?
+                """,
+                (new_price, vendor_reply, "Improved Offer", savings, now, negotiation_id),
+            )
+
+            # Also update the corresponding vendor quote price in vendor_quotes table!
+            if procurement_id:
+                await db.execute(
+                    """
+                    UPDATE vendor_quotes
+                    SET price = ?,
+                        savings_amount = ?,
+                        savings_percentage = ?
+                    WHERE procurement_id = ? AND vendor_name = ?
+                    """,
+                    (new_price, savings, round((savings / initial_price) * 100.0, 1), procurement_id, vendor_name),
+                )
+
+                # Fetch updated quote to check savings
+                quote_cur = await db.execute(
+                    "SELECT price FROM vendor_quotes WHERE procurement_id = ?",
+                    (procurement_id,),
+                )
+                prices = [r[0] for r in await quote_cur.fetchall()]
+                if prices:
+                    # Update procurement ticket recommended price if this vendor is recommended
+                    await db.execute(
+                        """
+                        UPDATE procurements
+                        SET recommended_price = ?
+                        WHERE id = ? AND recommended_vendor = ?
+                        """,
+                        (new_price, procurement_id, vendor_name),
+                    )
+
+            await db.commit()
+
+            # Dispatch events after commit
+            from backend.realtime import realtime_manager
+            from backend.webhook_dispatcher import webhook_dispatcher
+            import asyncio
+
+            asyncio.create_task(realtime_manager.emit_negotiation_update(
+                negotiation_id=negotiation_id,
+                status="Improved Offer",
+                current_price=new_price,
+                savings=savings
+            ))
+            asyncio.create_task(webhook_dispatcher.dispatch(
+                "negotiation.completed",
+                {
+                    "negotiation_id": negotiation_id,
+                    "procurement_id": procurement_id,
+                    "vendor_name": vendor_name,
+                    "price": new_price,
+                    "savings": savings
+                }
+            ))
+
+        # Load updated thread
+        updated_threads = await list_negotiations(procurement_id)
+        for t in updated_threads:
+            if t.id == negotiation_id:
+                return t
+
+        # Fallback constructor
+        return NegotiationThread(
+            id=negotiation_id,
+            procurement_id=procurement_id,
+            vendor_name=vendor_name,
+            status=NegotiationStatus.IMPROVED_OFFER,
+            initial_price=initial_price,
+            target_price=row["target_price"],
+            current_price=new_price,
+            counter_offer_text=row["counter_offer_text"],
+            vendor_reply_text=vendor_reply,
+            savings_achieved=savings,
+        )
+
     # ---------------------------------------------------------
     # 5. Vendor Risk Detection Engine
     # ---------------------------------------------------------

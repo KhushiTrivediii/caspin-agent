@@ -1,33 +1,27 @@
 import re
 import uuid
 import logging
-from typing import Optional, Dict, Any, List, Tuple
 from datetime import datetime
+from typing import Dict, Any, Optional, Tuple
 
 from backend.models import (
-    ProcurementTicket,
-    ProcurementStatus,
-    ProcurementRequirement,
-    VendorQuote,
     ChannelType,
-    ChannelMessage,
-    ApprovalDecision,
+    MessageLog,
+    IncidentTicket,
+    TicketStatus,
+    IncidentCategory,
 )
 from backend.database import (
-    get_next_procurement_id,
-    create_procurement,
-    get_procurement,
-    list_procurements,
-    update_procurement_stage,
-    record_approval_decision,
-    get_conversation_state,
-    save_conversation_state,
-    clear_conversation_state,
+    create_ticket,
+    get_ticket,
+    update_ticket_status,
+    log_audit_action,
     save_channel_message,
-    save_purchase_order,
+    get_settings,
+    get_channel_messages,
+    add_graph_node,
+    add_graph_edge,
 )
-from backend.po_generator import po_engine
-from backend.ai_engine import ai_engine
 from backend.caspian_service import caspian_service
 
 logger = logging.getLogger("workflow_manager")
@@ -35,9 +29,9 @@ logger = logging.getLogger("workflow_manager")
 
 class WorkflowManager:
     """
-    Orchestrates the end-to-end Enterprise AI Procurement Workflow:
-    Requirement Ingestion -> Multi-turn Follow-up -> Structuring & Ticket Generation ->
-    Vendor Bidding -> Approval Routing -> Multi-Channel Notifications.
+    BLACKBOX AI Autonomous Cognitive Coordinator.
+    Performs classification, Memory Graph lookups, action routing,
+    and coordinates cross-channel communications.
     """
 
     async def handle_inbound_message(
@@ -45,303 +39,448 @@ class WorkflowManager:
         channel: ChannelType,
         sender_id: str,
         sender_name: str,
-        sender_email: Optional[str],
-        conversation_id: str,
-        text: str,
-        subject: Optional[str] = None,
+        sender_email: Optional[str] = None,
+        conversation_id: Optional[str] = None,
+        text: str = "",
     ) -> Dict[str, Any]:
         """
-        Process any incoming message from Telegram, Email, or Web Simulator.
+        Normalized entry point for all channels.
+        Processes incoming texts, updates state/memory, and takes outbound actions.
         """
         raw_text = text.strip()
-
-        # 1. Save user's incoming message
-        inbound_msg = ChannelMessage(
+        conv_id = conversation_id or f"{channel.value}_{sender_id}"
+        
+        # 1. Save incoming message
+        inbound_msg = MessageLog(
             id=f"MSG-{uuid.uuid4().hex[:10]}",
-            conversation_id=conversation_id,
             channel=channel.value,
-            sender_id=sender_id,
-            sender_name=sender_name,
-            recipient="procurement_ai_agent",
-            subject=subject,
+            direction="inbound",
+            sender=sender_name or sender_id,
+            recipient="blackbox_ai",
             text=raw_text,
-            is_agent=False,
             timestamp=datetime.utcnow(),
         )
         await save_channel_message(inbound_msg)
 
-        # 2. Check if this message is an approval response (e.g. "Approve", "Reject", "Approve PROC-2026-001")
-        approval_decision = self._check_approval_command(raw_text)
-        if approval_decision:
-            action, target_ticket_id = approval_decision
-            return await self._process_channel_approval(
-                action=action,
-                ticket_id=target_ticket_id,
-                channel=channel,
-                sender_id=sender_id,
-                sender_name=sender_name,
-                conversation_id=conversation_id,
-            )
+        # 2. Check if this is an operational command from a team member or founder
+        action_result = await self._process_command(channel, sender_id, sender_name, conv_id, raw_text)
+        if action_result:
+            return action_result
 
-        # 3. Retrieve ongoing conversation state for multi-turn dialogue
-        existing_state = await get_conversation_state(conversation_id)
+        # 3. Route through Agent Engine Cognitive Reasoning Loop
+        from backend.agent_engine import agent_engine
+        return await agent_engine.process_reasoning_cycle(channel, sender_id, sender_name, raw_text)
 
-        # 4. AI Engine requirement extraction and missing field detection
-        extraction = ai_engine.process_message(
-            text=raw_text,
-            current_state=existing_state,
-            channel=channel,
-            sender_id=sender_id,
-            sender_name=sender_name,
-            sender_email=sender_email,
-        )
+    def _classify_message(self, text: str) -> Tuple[IncidentCategory, str]:
+        """Classify incoming natural language into categories."""
+        text_lower = text.lower()
+        if any(k in text_lower for k in ["refund", "money", "charged", "billing", "invoice"]):
+            return IncidentCategory.CUSTOMER_SUPPORT, "High"
+        if any(k in text_lower for k in ["blocker", "blocked", "down", "broken", "biometric", "offline", "server Gateway"]):
+            return IncidentCategory.TEAM_OPERATIONS, "Critical"
+        if any(k in text_lower for k in ["bug", "error", "404", "500", "crashed", "fails"]):
+            return IncidentCategory.COMMUNITY_INTELLIGENCE, "Medium"
+        if any(k in text_lower for k in ["delay", "delayed", "shipment", "freight", "customs", "delivery"]):
+            return IncidentCategory.VENDOR_INTELLIGENCE, "High"
+        return IncidentCategory.LEAD_FOLLOWUP, "Low"
 
-        # If information is missing, ask intelligent follow-up question
-        if not extraction.is_complete:
-            # Persist intermediate state
-            current_dict = {
-                "product": extraction.requirement.product,
-                "quantity": extraction.requirement.quantity,
-                "budget": extraction.requirement.budget,
-                "currency": extraction.requirement.currency,
-                "delivery_days": extraction.requirement.delivery_days,
-                "specifications": extraction.requirement.specifications,
-                "requester_id": sender_id,
-                "requester_name": sender_name,
-                "requester_email": sender_email,
-                "channel": channel.value,
-            }
-            await save_conversation_state(conversation_id, sender_id, channel.value, current_dict)
-
-            # Reply with follow-up question
-            follow_up = extraction.follow_up_question or "Could you provide additional details regarding your budget and timeline?"
-            await caspian_service.send_message(
-                channel=channel,
-                recipient_id=sender_id,
-                conversation_id=conversation_id,
-                text=follow_up,
-                subject=f"Re: {subject}" if subject else "Procurement Requirement Follow-up",
-            )
-
-            return {
-                "status": "in_progress",
-                "is_complete": False,
-                "missing_fields": extraction.missing_fields,
-                "reply": follow_up,
-                "current_state": current_dict,
-            }
-
-        # 5. Requirements are COMPLETE! Create structured ticket & run vendor search
-        await clear_conversation_state(conversation_id)
-
-        req = extraction.requirement
-        ticket_id = await get_next_procurement_id()
-
-        # Generate competitive vendor quotes
-        quotes = ai_engine.generate_vendor_quotes(req, ticket_id)
-        recommended_quote = next((q for q in quotes if q.is_recommended), quotes[0] if quotes else None)
-
-        title = f"{req.quantity}x {req.product} Procurement"
-        summary = (
-            f"Procurement for {req.quantity} {req.product}(s) with budget of {ai_engine.format_currency_inr(req.budget or 0)}. "
-            f"Specifications: {', '.join(req.specifications) if req.specifications else 'Standard'}. "
-            f"Best offer from {recommended_quote.vendor_name if recommended_quote else 'Vendor'} "
-            f"at {ai_engine.format_currency_inr(recommended_quote.price if recommended_quote else req.budget or 0)} "
-            f"with delivery in {recommended_quote.delivery_days if recommended_quote else req.delivery_days} days."
-        )
-
-        ticket = ProcurementTicket(
-            id=ticket_id,
-            title=title,
-            product=req.product or "Item",
-            quantity=req.quantity or 1,
-            budget=req.budget or 0.0,
-            currency=req.currency,
-            delivery_days=req.delivery_days or 10,
-            specifications=req.specifications,
-            status=ProcurementStatus.APPROVAL_PENDING,
-            current_stage="Approval Pending",
-            approval_tier=po_engine.determine_approval_tier(req.budget or 0.0),
-            requester_id=sender_id,
-            requester_name=sender_name,
-            requester_email=sender_email,
-            channel=channel,
-            recommended_vendor=recommended_quote.vendor_name if recommended_quote else None,
-            recommended_price=recommended_quote.price if recommended_quote else req.budget,
-            recommended_delivery_days=recommended_quote.delivery_days if recommended_quote else req.delivery_days,
-            quotes=quotes,
-            summary=summary,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
-        )
-
-        created_ticket = await create_procurement(ticket)
-
-        # 6. Send Ticket Creation & Structured Confirmation to Employee
-        structured_json = {
-            "product": ticket.product,
-            "quantity": ticket.quantity,
-            "budget": ticket.budget,
-            "delivery_days": ticket.delivery_days,
-            "specifications": ticket.specifications,
-        }
-
-        confirmation_text = (
-            f"🎉 *Procurement Ticket Created: {ticket.id}*\n\n"
-            f"📋 *Structured Requirements:*\n"
-            f"• Product: {ticket.product}\n"
-            f"• Quantity: {ticket.quantity}\n"
-            f"• Budget: {ai_engine.format_currency_inr(ticket.budget)}\n"
-            f"• Delivery: {ticket.delivery_days} Days\n"
-            f"• Specs: {', '.join(ticket.specifications)}\n\n"
-            f"🔍 *Vendor Search Complete:* 3 competitive bids evaluated."
-        )
-
-        await caspian_service.send_message(
-            channel=channel,
-            recipient_id=sender_id,
-            conversation_id=conversation_id,
-            text=confirmation_text,
-            procurement_id=ticket.id,
-        )
-
-        # 7. Dispatch Approval Request to Manager / Channel
-        approval_prompt = ai_engine.generate_approval_prompt(ticket)
-        subject_mail, text_mail, html_mail = ai_engine.generate_email_summary(ticket)
-
-        buttons_action = [
-            {"text": "✅ Approve", "value": f"APPROVE {ticket.id}"},
-            {"text": "❌ Reject", "value": f"REJECT {ticket.id}"},
-        ]
-
-        await caspian_service.send_message(
-            channel=channel,
-            recipient_id=sender_id,
-            conversation_id=conversation_id,
-            text=approval_prompt,
-            html=html_mail if channel == ChannelType.EMAIL else None,
-            subject=subject_mail if channel == ChannelType.EMAIL else None,
-            procurement_id=ticket.id,
-            buttons_list=buttons_action,
-        )
-
-        return {
-            "status": "ticket_created",
-            "is_complete": True,
-            "ticket": created_ticket,
-            "structured_requirement": structured_json,
-            "approval_prompt": approval_prompt,
-            "quotes": quotes,
-        }
-
-    def _check_approval_command(self, text: str) -> Optional[Tuple[str, Optional[str]]]:
-        """Detect if message is an approval or rejection command."""
-        text_clean = text.strip()
-        text_lower = text_clean.lower()
-
-        # Check for explicit command with ID: e.g. "APPROVE PROC-2026-001" or "REJECT PROC-2026-001"
-        id_match = re.search(r'\b(PROC-[0-9]{4}-[0-9]{3})\b', text_clean, re.IGNORECASE)
-        ticket_id = id_match.group(1).upper() if id_match else None
-
-        if re.search(r'\b(approve|approved|accept|yes|confirm|looks good|proceed)\b', text_lower):
-            return ("APPROVED", ticket_id)
-        elif re.search(r'\b(reject|rejected|decline|no|cancel|deny)\b', text_lower):
-            return ("REJECTED", ticket_id)
-
-        return None
-
-    async def _process_channel_approval(
+    async def _process_command(
         self,
-        action: str,
-        ticket_id: Optional[str],
         channel: ChannelType,
         sender_id: str,
         sender_name: str,
         conversation_id: str,
+        text: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Detect and execute developer or manager actions (Accept/Resolve/Assign)."""
+        text_upper = text.upper()
+        
+        # Scenario A: Technician accepts a task
+        if "ACCEPT" in text_upper:
+            # Find the latest open ticket assigned to this contact
+            assigned_ticket = await self._find_active_ticket_by_contact(sender_id)
+            if assigned_ticket:
+                await update_ticket_status(assigned_ticket.id, TicketStatus.OPEN, assigned_to=sender_name)
+                await log_audit_action(assigned_ticket.id, "ACCEPT_TASK", sender_name, "Technician accepted task and started work.")
+                
+                # Notify original reporter
+                reporter_channel = ChannelType(assigned_ticket.reporter_contact.split("_")[0]) if "_" in assigned_ticket.reporter_contact else ChannelType.EMAIL
+                reporter_id = assigned_ticket.reporter_contact.split("_")[1] if "_" in assigned_ticket.reporter_contact else assigned_ticket.reporter_contact
+                
+                update_text = f"⚙️ *Update [INC-2026]:* Engineer {sender_name} has accepted task and is working on a fix."
+                await caspian_service.send_message(
+                    channel=reporter_channel,
+                    recipient_id=reporter_id,
+                    conversation_id=f"rep_{assigned_ticket.id}",
+                    text=update_text,
+                    ticket_id=assigned_ticket.id,
+                )
+                return {"status": "accepted", "ticket_id": assigned_ticket.id}
+
+        # Scenario B: Technician resolves a task
+        if "RESOLVED" in text_upper:
+            assigned_ticket = await self._find_active_ticket_by_contact(sender_id)
+            if assigned_ticket:
+                res_details = text.split("RESOLVED")[-1].replace("-", "").strip() or "Issue resolved by technician."
+                await update_ticket_status(assigned_ticket.id, TicketStatus.RESOLVED, summary=res_details)
+                await log_audit_action(assigned_ticket.id, "RESOLVE_TASK", sender_name, f"Task completed: {res_details}")
+
+                # Notify original reporter
+                reporter_channel = ChannelType(assigned_ticket.reporter_contact.split("_")[0]) if "_" in assigned_ticket.reporter_contact else ChannelType.EMAIL
+                reporter_id = assigned_ticket.reporter_contact.split("_")[1] if "_" in assigned_ticket.reporter_contact else assigned_ticket.reporter_contact
+
+                resolution_text = f"✅ *Resolved [INC-2026]:* Your issue has been resolved by {sender_name}. Summary: {res_details}"
+                await caspian_service.send_message(
+                    channel=reporter_channel,
+                    recipient_id=reporter_id,
+                    conversation_id=f"rep_{assigned_ticket.id}",
+                    text=resolution_text,
+                    ticket_id=assigned_ticket.id,
+                )
+                return {"status": "resolved", "ticket_id": assigned_ticket.id}
+
+        # Scenario C: Manager Assign Action (e.g. from Telegram button)
+        # e.g., "ASSIGN dev_alice INC-2026-X"
+        assign_match = re.match(r'^ASSIGN\s+(\w+)\s+(INC-2026-\w+)$', text, re.IGNORECASE)
+        if assign_match:
+            tech_id = assign_match.group(1)
+            target_ticket_id = assign_match.group(2)
+            ticket = await get_ticket(target_ticket_id)
+            if ticket:
+                # Map tech_id to name and channel
+                tech_name = "Alice (DevOps)" if "alice" in tech_id else "Bob (Backend)"
+                tech_contact = "alice_devops" if "alice" in tech_id else "bob_slack"
+                tech_channel = ChannelType.TELEGRAM if "alice" in tech_id else ChannelType.SLACK
+
+                await update_ticket_status(target_ticket_id, TicketStatus.OPEN, assigned_to=tech_name)
+                await log_audit_action(target_ticket_id, "MANAGER_ASSIGN", "Manager", f"Assigned ticket to {tech_name}")
+
+                # Ping the tech directly
+                task_dispatch_text = (
+                    f"🚨 *URGENT TASK DISPATCH* [{target_ticket_id}]\n\n"
+                    f"Hi {tech_name}, you have been assigned an escalated incident by the Founder:\n"
+                    f"• Description: {ticket.description}\n\n"
+                    f"Please reply with 'ACCEPT' to start or 'RESOLVED [details]' when done."
+                )
+                await caspian_service.send_message(
+                    channel=tech_channel,
+                    recipient_id=tech_contact,
+                    conversation_id=f"tech_{target_ticket_id}",
+                    text=task_dispatch_text,
+                    ticket_id=target_ticket_id,
+                    buttons_list=[{"text": "Accept Task", "value": "ACCEPT"}]
+                )
+                
+                # Reply to manager
+                await caspian_service.send_message(
+                    channel=channel,
+                    recipient_id=sender_id,
+                    conversation_id=conversation_id,
+                    text=f"✅ Assigned {target_ticket_id} to {tech_name} successfully.",
+                )
+                return {"status": "assigned", "ticket_id": target_ticket_id}
+
+        return None
+
+    async def _find_active_ticket_by_contact(self, contact_id: str) -> Optional[IncidentTicket]:
+        """Find latest open ticket associated with a technician contact."""
+        from backend.database import list_tickets
+        tickets = await list_tickets(status=TicketStatus.OPEN.value)
+        # Look for tickets assigned to this name
+        # Bob is assigned Bob, contact is bob_slack. Alice is assigned Alice, contact is alice_devops.
+        tech_name = "Bob" if "bob" in contact_id.lower() else ("Alice" if "alice" in contact_id.lower() else "Clara")
+        for t in tickets:
+            if t.assigned_to and tech_name in t.assigned_to:
+                return t
+        
+        # Fallback: check unassigned tickets matching category
+        for t in tickets:
+            if not t.assigned_to:
+                if tech_name == "Bob" and t.category in (IncidentCategory.TEAM_OPERATIONS, IncidentCategory.COMMUNITY_INTELLIGENCE):
+                    return t
+                if tech_name == "Alice" and t.category == IncidentCategory.TEAM_OPERATIONS:
+                    return t
+        return None
+
+    # -------------------------------------------------------------
+    # 5. Incident Handlers
+    # -------------------------------------------------------------
+
+    async def _handle_customer_support(
+        self,
+        ticket_id: str,
+        sender_name: str,
+        sender_id: str,
+        channel: ChannelType,
+        conv_id: str,
+        text: str,
     ) -> Dict[str, Any]:
-        """Handle manager approval or rejection command via message."""
-        target_ticket = None
-
-        if ticket_id:
-            target_ticket = await get_procurement(ticket_id)
-        else:
-            # Find latest ticket in Approval Pending stage
-            pending_tickets = await list_procurements(status=ProcurementStatus.APPROVAL_PENDING.value, limit=5)
-            if pending_tickets:
-                target_ticket = pending_tickets[0]
-
-        if not target_ticket:
-            reply_text = "⚠️ No pending procurement request found to approve/reject."
-            await caspian_service.send_message(
-                channel=channel,
-                recipient_id=sender_id,
-                conversation_id=conversation_id,
-                text=reply_text,
-            )
-            return {"status": "error", "message": reply_text}
-
-        # Apply approval decision
-        await record_approval_decision(
-            procurement_id=target_ticket.id,
-            status=action,
-            approver=sender_name or "Manager",
-            channel=channel.value,
-            notes=f"Processed via {channel.value.title()} interaction",
+        """Feature 1: Customer Rescue Engine - Processes complaints, updates memory, escalates."""
+        ticket = IncidentTicket(
+            id=ticket_id,
+            category=IncidentCategory.CUSTOMER_SUPPORT,
+            title="Pending Customer Refund Complaint",
+            description=f"Customer {sender_name} complained about missing refund: '{text}'",
+            reporter_name=sender_name,
+            reporter_contact=f"{channel.value}_{sender_id}",
+            summary="Checking transaction state...",
         )
+        await create_ticket(ticket)
+        await log_audit_action(ticket_id, "TICKET_LOGGED", "BLACKBOX", "Customer Support refund complaint ticket logged.")
 
-        if action == "APPROVED":
-            reply_text = (
-                f"✅ *Procurement Approved!* [{target_ticket.id}]\n\n"
-                f"Vendor *{target_ticket.recommended_vendor}* has been officially selected.\n"
-                f"PO generation and fulfillment tracking initiated.\n"
-                f"Estimated delivery: {target_ticket.recommended_delivery_days} days."
-            )
-        else:
-            reply_text = (
-                f"❌ *Procurement Rejected* [{target_ticket.id}]\n\n"
-                f"The request for {target_ticket.quantity}x {target_ticket.product} has been declined."
-            )
-
+        # Simulate database lookup for client history
+        refund_eta = "24 Hours"
+        reply_to_customer = f"Hello {sender_name},\n\nWe have verified our payments queue. Your refund is scheduled and currently pending processing. It is expected to clear in approximately {refund_eta}.\n\nThank you for your patience."
+        
+        # Outbound 1: Reply to Customer on their channel (e.g. Email)
         await caspian_service.send_message(
             channel=channel,
             recipient_id=sender_id,
-            conversation_id=conversation_id,
-            text=reply_text,
-            procurement_id=target_ticket.id,
+            conversation_id=conv_id,
+            text=reply_to_customer,
+            ticket_id=ticket_id,
         )
 
-        updated_ticket = await get_procurement(target_ticket.id)
-        return {
-            "status": "approval_processed",
-            "decision": action,
-            "ticket": updated_ticket,
-            "reply": reply_text,
-        }
-
-    async def advance_stage(self, procurement_id: str, new_stage: str, actor: str = "Manager") -> Optional[ProcurementTicket]:
-        """Manually or programmatically advance ticket stage."""
-        ticket = await get_procurement(procurement_id)
-        if not ticket:
-            return None
-
-        status_mapping = {
-            "Open": ProcurementStatus.OPEN,
-            "Vendor Search": ProcurementStatus.VENDOR_SEARCH,
-            "Negotiation": ProcurementStatus.NEGOTIATION,
-            "Approval Pending": ProcurementStatus.APPROVAL_PENDING,
-            "Approved": ProcurementStatus.APPROVED,
-            "Rejected": ProcurementStatus.REJECTED,
-            "Completed": ProcurementStatus.COMPLETED,
-        }
-
-        new_status = status_mapping.get(new_stage, ticket.status)
-        await update_procurement_stage(
-            procurement_id=procurement_id,
-            status=new_status,
-            current_stage=new_stage,
-            actor=actor,
+        # Outbound 2: Post to Slack (#finance-ops / Clara)
+        finance_alert = (
+            f"🚨 *REFUND DISPUTE DETECTED* [{ticket_id}]\n\n"
+            f"• Customer: {sender_name}\n"
+            f"• Complaint: '{text}'\n"
+            f"• Action taken: Auto-notified customer of tomorrow's refund queue.\n"
+            f"• Recommended: Finance Lead verify transaction status."
         )
-        return await get_procurement(procurement_id)
+        await caspian_service.send_message(
+            channel=ChannelType.SLACK,
+            recipient_id="clara_ops",
+            conversation_id=f"fin_{ticket_id}",
+            text=finance_alert,
+            ticket_id=ticket_id,
+        )
+
+        # Outbound 3: Founder Notification on Telegram
+        settings = await get_settings()
+        is_founder_away = settings.get("founder_disappears_mode") == "1"
+
+        if is_founder_away:
+            # Fully autonomous resolution, log audit
+            await log_audit_action(ticket_id, "AUTO_RESOLVE", "BLACKBOX", "Founder Disappears mode active. Refund resolution handled fully autonomously.")
+        else:
+            founder_telegram_alert = (
+                f"🚨 *Customer Risk Alert* [{ticket_id}]\n\n"
+                f"Client {sender_name} complained about pending refund. Support email replied. Ops notified on Slack.\n"
+                f"Priority: Medium."
+            )
+            await caspian_service.send_message(
+                channel=ChannelType.TELEGRAM,
+                recipient_id="founder_tg",
+                conversation_id=f"fnd_{ticket_id}",
+                text=founder_telegram_alert,
+                ticket_id=ticket_id,
+            )
+
+        return {"status": "processed", "ticket_id": ticket_id, "action": "customer_support_rescue"}
+
+    async def _handle_team_operations(
+        self,
+        ticket_id: str,
+        sender_name: str,
+        sender_id: str,
+        channel: ChannelType,
+        conv_id: str,
+        text: str,
+    ) -> Dict[str, Any]:
+        """Feature 4: Team Operations Monitor - Dispatches tasks, notifies blockers."""
+        ticket = IncidentTicket(
+            id=ticket_id,
+            category=IncidentCategory.TEAM_OPERATIONS,
+            title="Biometric Door Scanner Blockage",
+            description=f"DevOps/Facilities issue reported: '{text}'",
+            reporter_name=sender_name,
+            reporter_contact=f"{channel.value}_{sender_id}",
+        )
+        await create_ticket(ticket)
+        await log_audit_action(ticket_id, "TICKET_LOGGED", "BLACKBOX", "Team Operations blocker ticket logged.")
+
+        # Determine technician: Alice (DevOps Lead) preferred channel: Telegram
+        assigned_tech = "Alice (DevOps Lead)"
+        tech_contact = "alice_devops"
+        tech_channel = ChannelType.TELEGRAM
+
+        # Dispatch Task to Technician
+        task_dispatch = (
+            f"🚨 *URGENT INCIDENT DISPATCH* [{ticket_id}]\n\n"
+            f"Hi Alice, the biometric scanner is offline. Employees are locked out.\n"
+            f"Please reply with 'ACCEPT' to start, or 'RESOLVED [details]'."
+        )
+        await caspian_service.send_message(
+            channel=tech_channel,
+            recipient_id=tech_contact,
+            conversation_id=f"tech_{ticket_id}",
+            text=task_dispatch,
+            ticket_id=ticket_id,
+            buttons_list=[{"text": "Accept Task", "value": "ACCEPT"}]
+        )
+
+        # Notify reporter
+        reporter_notify = f"⚠️ *Blocker Logged [INC-2026]:* We have dispatched this issue to DevOps Lead {assigned_tech} on Telegram. We will notify you once they accept/resolve the task."
+        await caspian_service.send_message(
+            channel=channel,
+            recipient_id=sender_id,
+            conversation_id=conv_id,
+            text=reporter_notify,
+            ticket_id=ticket_id,
+        )
+
+        return {"status": "processed", "ticket_id": ticket_id, "action": "team_operations_dispatch"}
+
+    async def _handle_community_bug(
+        self,
+        ticket_id: str,
+        sender_name: str,
+        sender_id: str,
+        channel: ChannelType,
+        conv_id: str,
+        text: str,
+    ) -> Dict[str, Any]:
+        """Feature 5: Community Intelligence - Ingests community reports, alerts dev."""
+        ticket = IncidentTicket(
+            id=ticket_id,
+            category=IncidentCategory.COMMUNITY_INTELLIGENCE,
+            title="Discord Community crash report",
+            description=f"Discord community member reported: '{text}'",
+            reporter_name=sender_name,
+            reporter_contact=f"{channel.value}_{sender_id}",
+        )
+        await create_ticket(ticket)
+        await log_audit_action(ticket_id, "TICKET_LOGGED", "BLACKBOX", "Discord community bug report ticket logged.")
+
+        # Update Memory Graph with new bug linked to project_payments
+        await add_graph_node(ticket_id, "Task", {"name": "Fix Payments Bug", "status": "Reported"})
+        await add_graph_edge(ticket_id, "project_payments", "BLOCKS")
+
+        # Alert developer Bob on Slack
+        dev_alert = (
+            f"🐛 *NEW BUG REPORTED IN COMMUNITY* [{ticket_id}]\n\n"
+            f"• Source: Discord Community (Reported by {sender_name})\n"
+            f"• Issue: '{text}'\n"
+            f"• Linked Project: Payments System Gateway\n"
+            f"• Action: Bug registered. Bob (Backend) please review."
+        )
+        await caspian_service.send_message(
+            channel=ChannelType.SLACK,
+            recipient_id="bob_slack",
+            conversation_id=f"dev_{ticket_id}",
+            text=dev_alert,
+            ticket_id=ticket_id,
+            buttons_list=[{"text": "Accept & Resolve", "value": "ACCEPT"}]
+        )
+
+        # Reply to Discord member
+        discord_reply = f"Thank you for reporting this issue! I've logged it as ticket {ticket_id} and notified our core backend developer Bob on Slack. We'll update you here once resolved."
+        await caspian_service.send_message(
+            channel=channel,
+            recipient_id=sender_id,
+            conversation_id=conv_id,
+            text=discord_reply,
+            ticket_id=ticket_id,
+        )
+
+        return {"status": "processed", "ticket_id": ticket_id, "action": "community_bug_logged"}
+
+    async def _handle_vendor_delay(
+        self,
+        ticket_id: str,
+        sender_name: str,
+        sender_id: str,
+        channel: ChannelType,
+        conv_id: str,
+        text: str,
+    ) -> Dict[str, Any]:
+        """Feature 3: Vendor Intelligence - Monitors vendor delays, alerts operations."""
+        ticket = IncidentTicket(
+            id=ticket_id,
+            category=IncidentCategory.VENDOR_INTELLIGENCE,
+            title="DHL Shipment Delayed",
+            description=f"Logistics delay reported: '{text}'",
+            reporter_name=sender_name,
+            reporter_contact=f"{channel.value}_{sender_id}",
+        )
+        await create_ticket(ticket)
+        await log_audit_action(ticket_id, "TICKET_LOGGED", "BLACKBOX", "Vendor shipping delay ticket logged.")
+
+        # Update Memory Graph: vendor_dhl is delayed, which impacts project_payments
+        await add_graph_node(ticket_id, "Task", {"name": "Resolve DHL Delay", "status": "Delayed"})
+        await add_graph_edge("vendor_dhl", ticket_id, "CAUSED")
+        await add_graph_edge(ticket_id, "project_payments", "IMPACTS")
+
+        # Alert operations lead Clara on Slack
+        ops_alert = (
+            f"📦 *VENDOR SHIPMENT DELAY ALERT* [{ticket_id}]\n\n"
+            f"• Vendor: DHL Express Logistics\n"
+            f"• Notice: '{text}'\n"
+            f"• Impact: Project Payments System Gateway hardware delivery delayed.\n"
+            f"• Action: Ops team Clara please coordinate with supplier."
+        )
+        await caspian_service.send_message(
+            channel=ChannelType.SLACK,
+            recipient_id="clara_ops",
+            conversation_id=f"ops_{ticket_id}",
+            text=ops_alert,
+            ticket_id=ticket_id,
+        )
+
+        return {"status": "processed", "ticket_id": ticket_id, "action": "vendor_delay_logged"}
+
+    async def _handle_lead_inactivity(
+        self,
+        ticket_id: str,
+        sender_name: str,
+        sender_id: str,
+        channel: ChannelType,
+        conv_id: str,
+        text: str,
+    ) -> Dict[str, Any]:
+        """Feature 2: Lead Recovery System - Detects inactivity or coordinates meetings."""
+        ticket = IncidentTicket(
+            id=ticket_id,
+            category=IncidentCategory.LEAD_FOLLOWUP,
+            title="Tesla Account Engagement Follow-up",
+            description=f"Lead interaction: '{text}'",
+            reporter_name=sender_name,
+            reporter_contact=f"{channel.value}_{sender_id}",
+        )
+        await create_ticket(ticket)
+        await log_audit_action(ticket_id, "TICKET_LOGGED", "BLACKBOX", "Lead interaction ticket logged.")
+
+        # Update memory graph
+        await add_graph_node("lead_tesla", "Lead", {"name": "Tesla Corporate Procurement", "status": "Meeting Scheduled"})
+
+        # Notify team on Slack
+        sales_notification = (
+            f"💼 *LEAD RESPONSE CAPTURED* [{ticket_id}]\n\n"
+            f"• Lead: Tesla Corporate Procurement\n"
+            f"• Reply: '{text}'\n"
+            f"• Action: BLACKBOX logged interest and scheduled a meeting. CRM updated."
+        )
+        await caspian_service.send_message(
+            channel=ChannelType.SLACK,
+            recipient_id="clara_ops",
+            conversation_id=f"sales_{ticket_id}",
+            text=sales_notification,
+            ticket_id=ticket_id,
+        )
+
+        # Confirm to client
+        client_confirm = "Thank you! I have registered our meeting request for tomorrow Friday 11:00 AM. A calendar invitation has been dispatched to your email address."
+        await caspian_service.send_message(
+            channel=channel,
+            recipient_id=sender_id,
+            conversation_id=conv_id,
+            text=client_confirm,
+            ticket_id=ticket_id,
+        )
+
+        return {"status": "processed", "ticket_id": ticket_id, "action": "lead_recovered"}
 
 
 # Global singleton instance
