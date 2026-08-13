@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BLACKBOX AI — Judge Simulator</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-logo">■</span>
+      <div class="brand-text">
+        <span class="brand-name">BLACKBOX AI</span>
+        <span class="brand-sub">Autonomous Startup Operator &bull; Caspian 2026</span>
+      </div>
+    </div>
+
+    <nav class="nav-links">
+      <a href="/" class="nav-link">📊 Dashboard</a>
+      <a href="/feed" class="nav-link">📡 Live Feed</a>
+      <a href="/decision" class="nav-link">🤖 Decision Engine</a>
+      <a href="/simulator" class="nav-link active">⚡ Judge Simulator</a>
+    </nav>
+
+    <div class="topbar-right">
+      <div class="mode-toggle-card">
+        <span class="toggle-text">Founder Disappears Mode</span>
+        <label class="switch">
+          <input type="checkbox" id="toggle-founder-mode">
+          <span class="slider round"></span>
+        </label>
+      </div>
+
+      <div class="gateway-status">
+        <span class="pulse-dot green"></span>
+        <span>Active 🟢</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Simulator Container -->
+  <main class="page-container">
+    <section class="panel simulator-page-panel">
+      <div class="panel-header">
+        <span class="panel-title">⚡ Hackathon Judge Demo Suite</span>
+        <span class="panel-subtitle">Trigger multi-channel operational scenarios live on screen and observe autonomous agent responses</span>
+      </div>
+
+      <div class="simulator-grid">
+        <div class="sim-card">
+          <div class="sim-card-header">
+            <span class="sim-card-title">1. Customer Support Rescue</span>
+            <span class="channel-badge badge-email">EMAIL</span>
+          </div>
+          <p class="sim-card-desc">Customer emails about pending refund. BLACKBOX parses it, emails status, and alerts Slack/Telegram.</p>
+          <button class="btn btn-primary" onclick="triggerDemo('support')">Trigger Support Email Refund</button>
+        </div>
+
+        <div class="sim-card">
+          <div class="sim-card-header">
+            <span class="sim-card-title">2. Team Operations Blocker</span>
+            <span class="channel-badge badge-slack">SLACK</span>
+          </div>
+          <p class="sim-card-desc">Dev pings a blocker on Slack. BLACKBOX assigns DevOps, pings task details on Telegram, and alerts team.</p>
+          <button class="btn btn-primary" onclick="triggerDemo('blocker')">Trigger Slack Dev Blocker</button>
+        </div>
+
+        <div class="sim-card">
+          <div class="sim-card-header">
+            <span class="sim-card-title">3. Community Bug Report</span>
+            <span class="channel-badge badge-discord">DISCORD</span>
+          </div>
+          <p class="sim-card-desc">Discord member reports checkout bug. BLACKBOX updates memory graph and alerts dev on Slack.</p>
+          <button class="btn btn-primary" onclick="triggerDemo('bug')">Trigger Discord Bug Report</button>
+        </div>
+
+        <div class="sim-card">
+          <div class="sim-card-header">
+            <span class="sim-card-title">4. Vendor Intelligence Delay</span>
+            <span class="channel-badge badge-whatsapp">WHATSAPP</span>
+          </div>
+          <p class="sim-card-desc">DHL messages about shipment delays. BLACKBOX logs delay, updates memory node, and alerts ops on Slack.</p>
+          <button class="btn btn-primary" onclick="triggerDemo('delay')">Trigger Vendor WhatsApp Delay</button>
+        </div>
+
+        <div class="sim-card">
+          <div class="sim-card-header">
+            <span class="sim-card-title">5. Founder Daily Briefing</span>
+            <span class="channel-badge badge-telegram">TELEGRAM</span>
+          </div>
+          <p class="sim-card-desc">Dispatches daily startup KPI brief containing Opportunities, Risks, and Tasks directly to Founder on Telegram.</p>
+          <button class="btn btn-primary" onclick="triggerDemo('briefing')">Trigger Telegram Daily Briefing</button>
+        </div>
+
+        <div class="sim-card alert-card">
+          <div class="sim-card-header">
+            <span class="sim-card-title">6. SLA Escalation Trigger</span>
+            <span class="channel-badge badge-telegram">TELEGRAM</span>
+          </div>
+          <p class="sim-card-desc">Simulate background SLA breach on unassigned community bug. Founder Telegram gets interactive reassignment options.</p>
+          <button class="btn btn-danger" onclick="triggerDemo('escalate')">Trigger SLA Timeout</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

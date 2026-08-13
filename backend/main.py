@@ -76,6 +76,18 @@ if os.path.exists(static_dir):
     async def serve_index():
         return FileResponse(os.path.join(static_dir, "index.html"))
 
+    @app.get("/feed")
+    async def serve_feed():
+        return FileResponse(os.path.join(static_dir, "feed.html"))
+
+    @app.get("/decision")
+    async def serve_decision():
+        return FileResponse(os.path.join(static_dir, "decision.html"))
+
+    @app.get("/simulator")
+    async def serve_simulator():
+        return FileResponse(os.path.join(static_dir, "simulator.html"))
+
 
 if __name__ == "__main__":
     import uvicorn

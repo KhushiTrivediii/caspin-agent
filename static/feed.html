@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BLACKBOX AI — Live Activity Feed</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-logo">■</span>
+      <div class="brand-text">
+        <span class="brand-name">BLACKBOX AI</span>
+        <span class="brand-sub">Autonomous Startup Operator &bull; Caspian 2026</span>
+      </div>
+    </div>
+
+    <nav class="nav-links">
+      <a href="/" class="nav-link">📊 Dashboard</a>
+      <a href="/feed" class="nav-link active">📡 Live Feed</a>
+      <a href="/decision" class="nav-link">🤖 Decision Engine</a>
+      <a href="/simulator" class="nav-link">⚡ Judge Simulator</a>
+    </nav>
+
+    <div class="topbar-right">
+      <div class="mode-toggle-card">
+        <span class="toggle-text">Founder Disappears Mode</span>
+        <label class="switch">
+          <input type="checkbox" id="toggle-founder-mode">
+          <span class="slider round"></span>
+        </label>
+      </div>
+
+      <div class="gateway-status">
+        <span class="pulse-dot green"></span>
+        <span>Active 🟢</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Feed Container -->
+  <main class="page-container">
+    <section class="panel feed-page-panel">
+      <div class="panel-header">
+        <span class="panel-title">📡 Real-Time Live Activity Feed</span>
+        <span class="panel-subtitle">Live stream of multi-channel operations dispatched across Email, Slack, Discord, WhatsApp, and Telegram</span>
+      </div>
+
+      <div class="feed-stream" id="activity-feed-stream">
+        <!-- Activity items inserted dynamically -->
+        <div class="activity-item">
+          <span class="activity-time">11:02 AM</span>
+          <span class="activity-icon">✉️</span>
+          <div class="activity-body">
+            <span class="activity-title">Customer email received</span>
+            <span class="activity-desc">From Alex Mercer regarding order refund cancellation</span>
+          </div>
+        </div>
+
+        <div class="activity-item">
+          <span class="activity-time">11:02 AM</span>
+          <span class="activity-icon">🤖</span>
+          <div class="activity-body">
+            <span class="activity-title">Sent email response</span>
+            <span class="activity-desc">Auto-status update dispatched to customer via Email</span>
+          </div>
+        </div>
+
+        <div class="activity-item">
+          <span class="activity-time">11:03 AM</span>
+          <span class="activity-icon">💬</span>
+          <div class="activity-body">
+            <span class="activity-title">Posted alert to Slack</span>
+            <span class="activity-desc">Notified Operations Clara about ticket INC-2026-REF</span>
+          </div>
+        </div>
+
+        <div class="activity-item">
+          <span class="activity-time">11:03 AM</span>
+          <span class="activity-icon">📱</span>
+          <div class="activity-body">
+            <span class="activity-title">Notified founder on Telegram</span>
+            <span class="activity-desc">Escalation notice dispatched to Telegram</span>
+          </div>
+        </div>
+
+        <div class="activity-item">
+          <span class="activity-time">11:04 AM</span>
+          <span class="activity-icon">✅</span>
+          <div class="activity-body">
+            <span class="activity-title">Issue resolved & logged</span>
+            <span class="activity-desc">Memory graph relationships updated in database</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

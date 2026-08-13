@@ -1,5 +1,17 @@
 document.addEventListener("DOMContentLoaded", () => {
-  // 1. Native WebSocket Connection
+  // 1. Highlight Active Nav Link
+  const currentPath = window.location.pathname;
+  const navLinks = document.querySelectorAll(".nav-link");
+  navLinks.forEach(link => {
+    const href = link.getAttribute("href");
+    if (href === currentPath || (href !== "/" && currentPath.startsWith(href))) {
+      link.classList.add("active");
+    } else {
+      link.classList.remove("active");
+    }
+  });
+
+  // 2. Native WebSocket Connection
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   const wsUrl = `${protocol}//${window.location.host}/ws`;
   let socket = null;
@@ -37,7 +49,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   initWebSocket();
 
-  // 2. Element References
+  // 3. UI Element References
   const toggleFounderMode = document.getElementById("toggle-founder-mode");
   const feedStream = document.getElementById("activity-feed-stream");
   const decInbound = document.getElementById("dec-inbound");
@@ -47,22 +59,26 @@ document.addEventListener("DOMContentLoaded", () => {
   const decActionsList = document.getElementById("dec-actions-list");
 
   // Toggle Founder Mode
-  toggleFounderMode.addEventListener("change", async (e) => {
-    const enabled = e.target.checked;
-    try {
-      await fetch("/api/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ founder_disappears_mode: enabled })
-      });
-      refreshMetrics();
-    } catch (err) {
-      console.error(err);
-    }
-  });
+  if (toggleFounderMode) {
+    toggleFounderMode.addEventListener("change", async (e) => {
+      const enabled = e.target.checked;
+      try {
+        await fetch("/api/settings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ founder_disappears_mode: enabled })
+        });
+        refreshMetrics();
+      } catch (err) {
+        console.error(err);
+      }
+    });
+  }
 
-  // 3. UI Update Routines
+  // 4. UI Update Routines
   function addActivityFeedItem(item) {
+    if (!feedStream) return;
+
     const div = document.createElement("div");
     div.className = "activity-item";
 
@@ -123,12 +139,17 @@ document.addEventListener("DOMContentLoaded", () => {
       ]);
       if (statsRes.ok) {
         const stats = await statsRes.json();
-        document.getElementById("kpi-actions").textContent = (stats.issues || 0) + 42;
-        document.getElementById("kpi-saved").textContent = stats.opportunities || 5;
-        document.getElementById("kpi-vendor").textContent = stats.delays || 2;
-        document.getElementById("kpi-escalations").textContent = stats.risks || 3;
+        const actionsEl = document.getElementById("kpi-actions");
+        const savedEl = document.getElementById("kpi-saved");
+        const vendorEl = document.getElementById("kpi-vendor");
+        const escalationsEl = document.getElementById("kpi-escalations");
+
+        if (actionsEl) actionsEl.textContent = (stats.issues || 0) + 42;
+        if (savedEl) savedEl.textContent = stats.opportunities || 5;
+        if (vendorEl) vendorEl.textContent = stats.delays || 2;
+        if (escalationsEl) escalationsEl.textContent = stats.risks || 3;
       }
-      if (settingsRes.ok) {
+      if (settingsRes.ok && toggleFounderMode) {
         const settings = await settingsRes.json();
         toggleFounderMode.checked = settings.founder_disappears_mode === "1";
       }
@@ -137,9 +158,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // 4. Demo Trigger Handler
+  // 5. Demo Trigger Handler
   window.triggerDemo = async function(type) {
-    // Pulse channel card immediately based on trigger
     if (type === "support") pulseChannelCard("email");
     if (type === "blocker") pulseChannelCard("slack");
     if (type === "bug") pulseChannelCard("discord");
