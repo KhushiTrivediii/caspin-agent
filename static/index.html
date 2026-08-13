@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BLACKBOX AI — Startup Operator</title>
+  <title>BLACKBOX AI — Hackathon Control Center</title>
   <link rel="stylesheet" href="/static/css/style.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
 
@@ -15,12 +15,19 @@
       <span class="brand-logo">■</span>
       <div class="brand-text">
         <span class="brand-name">BLACKBOX AI</span>
-        <span class="brand-sub">Autonomous Startup Operator &bull; Caspian 2026</span>
+        <span class="brand-sub">Autonomous Startup Operator &bull; Caspian Hackathon 2026</span>
+      </div>
+    </div>
+
+    <div class="topbar-center">
+      <div class="agent-status-badge">
+        <span class="pulse-dot green"></span>
+        <span>Agent Status: Active</span>
       </div>
     </div>
 
     <div class="topbar-right">
-      <div class="mode-toggle">
+      <div class="mode-toggle-card">
         <span class="toggle-text">Founder Disappears Mode</span>
         <label class="switch">
           <input type="checkbox" id="toggle-founder-mode">
@@ -28,139 +35,189 @@
         </label>
       </div>
 
-      <div class="gateway-indicator">
+      <div class="gateway-status">
         <span class="pulse-dot green"></span>
         <span>Caspian Gateway</span>
       </div>
     </div>
   </header>
 
-  <!-- Workspace Container -->
-  <main class="app-layout">
+  <!-- Executive Metrics Bar -->
+  <section class="metrics-bar">
+    <div class="metric-card">
+      <span class="metric-title">Today's Actions</span>
+      <span class="metric-value" id="kpi-actions">47</span>
+    </div>
+    <div class="metric-card">
+      <span class="metric-title">Customers Saved</span>
+      <span class="metric-value success" id="kpi-saved">5</span>
+    </div>
+    <div class="metric-card">
+      <span class="metric-title">Vendor Issues</span>
+      <span class="metric-value warning" id="kpi-vendor">2</span>
+    </div>
+    <div class="metric-card">
+      <span class="metric-title">Open Escalations</span>
+      <span class="metric-value danger" id="kpi-escalations">3</span>
+    </div>
+  </section>
 
-    <!-- Left Column: Control Deck & Simulator Triggers -->
-    <aside class="sidebar">
-      <div class="sidebar-section">
-        <div class="section-label">Executive Briefing Overview</div>
-        <div class="kpi-grid">
-          <div class="kpi-card">
-            <span class="kpi-num" id="kpi-opps">--</span>
-            <span class="kpi-title">Opportunities</span>
+  <!-- Visual Caspian Cross-Channel Matrix -->
+  <section class="channels-matrix-container">
+    <div class="matrix-header">
+      <span>🌐 Caspian Cross-Channel Unified Identity Matrix</span>
+      <span class="matrix-sub">Channel highlights automatically when BLACKBOX AI dispatches multi-channel actions</span>
+    </div>
+    <div class="channels-matrix">
+      <div class="channel-card" id="channel-card-email">
+        <span class="channel-icon">📧</span>
+        <span class="channel-name">Email</span>
+        <span class="channel-status" id="status-email">Listening</span>
+      </div>
+      <div class="channel-card" id="channel-card-slack">
+        <span class="channel-icon">💬</span>
+        <span class="channel-name">Slack</span>
+        <span class="channel-status" id="status-slack">Listening</span>
+      </div>
+      <div class="channel-card" id="channel-card-telegram">
+        <span class="channel-icon">📱</span>
+        <span class="channel-name">Telegram</span>
+        <span class="channel-status" id="status-telegram">Listening</span>
+      </div>
+      <div class="channel-card" id="channel-card-discord">
+        <span class="channel-icon">🎮</span>
+        <span class="channel-name">Discord</span>
+        <span class="channel-status" id="status-discord">Listening</span>
+      </div>
+      <div class="channel-card" id="channel-card-whatsapp">
+        <span class="channel-icon">📞</span>
+        <span class="channel-name">WhatsApp</span>
+        <span class="channel-status" id="status-whatsapp">Listening</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Workspace Grid (Decision Panel + Live Activity Feed) -->
+  <main class="dashboard-grid">
+
+    <!-- Left Panel: Agent Decision Panel -->
+    <section class="panel decision-panel">
+      <div class="panel-header">
+        <span class="panel-title">🤖 Agent Decision Panel</span>
+        <span class="panel-subtitle">Cognitive reasoning, intention deduction & confidence meters</span>
+      </div>
+
+      <div class="decision-content">
+        <!-- Inbound Payload Block -->
+        <div class="decision-block">
+          <span class="block-label">Incoming Observation</span>
+          <div class="inbound-box" id="dec-inbound">
+            "Hi support, I still haven't received my refund for order #9928. Can you check this?"
           </div>
-          <div class="kpi-card">
-            <span class="kpi-num warning" id="kpi-risks">--</span>
-            <span class="kpi-title">Customer Risks</span>
+        </div>
+
+        <!-- Decision Intent -->
+        <div class="decision-block">
+          <span class="block-label">Deducted Decision Intent</span>
+          <div class="intent-box" id="dec-intent">
+            Pending Customer Refund Dispute &bull; Priority: High
           </div>
-          <div class="kpi-card">
-            <span class="kpi-num" id="kpi-issues">--</span>
-            <span class="kpi-title">Open Issues</span>
+        </div>
+
+        <!-- Confidence Score Meter -->
+        <div class="decision-block">
+          <div class="confidence-header">
+            <span class="block-label">AI Reasoning Confidence</span>
+            <span class="confidence-val" id="dec-confidence-val">96%</span>
           </div>
-          <div class="kpi-card">
-            <span class="kpi-num" id="kpi-delays">--</span>
-            <span class="kpi-title">Vendor Delays</span>
+          <div class="progress-bar">
+            <div class="progress-fill" id="dec-confidence-fill" style="width: 96%;"></div>
+          </div>
+        </div>
+
+        <!-- Actions Pipeline Checklist -->
+        <div class="decision-block flex-1">
+          <span class="block-label">Multi-Channel Actions Pipeline</span>
+          <div class="actions-checklist" id="dec-actions-list">
+            <div class="check-item done">✓ Replied to Customer #284 via Email</div>
+            <div class="check-item done">✓ Alerted Operations Team on Slack</div>
+            <div class="check-item done">✓ Checked Founder Disappears Mode state</div>
+            <div class="check-item done">✓ Updated Cognitive Memory Graph Node</div>
           </div>
         </div>
       </div>
+    </section>
 
-      <div class="sidebar-section flex-1">
-        <div class="section-label">Hackathon Scenario Simulator</div>
-        <div class="sim-list">
-          <button class="sim-btn" onclick="triggerSimulation('support')">
-            <span class="sim-name">1. Customer Rescue</span>
-            <span class="sim-desc">Refund Complaint &bull; Email &rarr; Slack/Telegram</span>
-          </button>
-          
-          <button class="sim-btn" onclick="triggerSimulation('blocker')">
-            <span class="sim-name">2. Team Operations</span>
-            <span class="sim-desc">Dev Blockage &bull; Slack &rarr; Telegram Task</span>
-          </button>
-
-          <button class="sim-btn" onclick="triggerSimulation('bug')">
-            <span class="sim-name">3. Community Bug</span>
-            <span class="sim-desc">Checkout Issue &bull; Discord &rarr; Slack</span>
-          </button>
-
-          <button class="sim-btn" onclick="triggerSimulation('delay')">
-            <span class="sim-name">4. Vendor Intelligence</span>
-            <span class="sim-desc">Shipment Delay &bull; WhatsApp &rarr; Memory Graph</span>
-          </button>
-
-          <button class="sim-btn" onclick="triggerSimulation('briefing')">
-            <span class="sim-name">5. Founder Briefing</span>
-            <span class="sim-desc">Daily KPI Brief &bull; Telegram</span>
-          </button>
-
-          <button class="sim-btn alert-btn" onclick="triggerSimulation('escalate')">
-            <span class="sim-name">6. SLA Escalation</span>
-            <span class="sim-desc">15s Unresolved Timeout &bull; Reassign Task</span>
-          </button>
-        </div>
-      </div>
-    </aside>
-
-    <!-- Right Column: Main Workspace with Tabs -->
-    <section class="main-content">
-
-      <!-- Navigation Tabs -->
-      <nav class="tab-bar">
-        <button class="tab-btn active" data-tab="tab-feed">📡 Operations Feed</button>
-        <button class="tab-btn" data-tab="tab-board">📋 Incident Queue</button>
-        <button class="tab-btn" data-tab="tab-graph">🧠 Memory Graph</button>
-      </nav>
-
-      <!-- Tab Views -->
-      <div class="tab-viewport">
-
-        <!-- Tab 1: Operations Feed -->
-        <div class="tab-pane active" id="tab-feed">
-          <div class="feed-container" id="logs-stream-container">
-            <div class="feed-empty">Ready for operational communications...</div>
-          </div>
-        </div>
-
-        <!-- Tab 2: Incident Board -->
-        <div class="tab-pane" id="tab-board">
-          <div class="table-wrapper">
-            <table class="tickets-table">
-              <thead>
-                <tr>
-                  <th>Ticket ID</th>
-                  <th>Category</th>
-                  <th>Title</th>
-                  <th>Assignee</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody id="tickets-tbody">
-                <tr><td colspan="5" class="table-empty">No active tickets found.</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Tab 3: Context Memory Graph -->
-        <div class="tab-pane" id="tab-graph">
-          <div class="graph-viewport">
-            <svg id="memory-graph-svg" width="100%" height="100%"></svg>
-          </div>
-        </div>
-
+    <!-- Right Panel: Live Activity Feed -->
+    <section class="panel feed-panel">
+      <div class="panel-header">
+        <span class="panel-title">📡 Real-Time Live Activity Feed</span>
+        <span class="panel-subtitle">Live stream of multi-channel operations</span>
       </div>
 
+      <div class="feed-stream" id="activity-feed-stream">
+        <!-- Activity items inserted dynamically -->
+        <div class="activity-item">
+          <span class="activity-time">11:02 AM</span>
+          <span class="activity-icon">✉️</span>
+          <div class="activity-body">
+            <span class="activity-title">Customer email received</span>
+            <span class="activity-desc">From Alex Mercer regarding order refund cancellation</span>
+          </div>
+        </div>
+
+        <div class="activity-item">
+          <span class="activity-time">11:02 AM</span>
+          <span class="activity-icon">🤖</span>
+          <div class="activity-body">
+            <span class="activity-title">Sent email response</span>
+            <span class="activity-desc">Auto-status update dispatched to customer via Email</span>
+          </div>
+        </div>
+
+        <div class="activity-item">
+          <span class="activity-time">11:03 AM</span>
+          <span class="activity-icon">💬</span>
+          <div class="activity-body">
+            <span class="activity-title">Posted alert to Slack</span>
+            <span class="activity-desc">Notified Operations Clara about ticket INC-2026-REF</span>
+          </div>
+        </div>
+
+        <div class="activity-item">
+          <span class="activity-time">11:03 AM</span>
+          <span class="activity-icon">📱</span>
+          <div class="activity-body">
+            <span class="activity-title">Notified founder on Telegram</span>
+            <span class="activity-desc">Escalation notice dispatched to Telegram</span>
+          </div>
+        </div>
+
+        <div class="activity-item">
+          <span class="activity-time">11:04 AM</span>
+          <span class="activity-icon">✅</span>
+          <div class="activity-body">
+            <span class="activity-title">Issue resolved & logged</span>
+            <span class="activity-desc">Memory graph relationships updated in database</span>
+          </div>
+        </div>
+      </div>
     </section>
 
   </main>
 
-  <!-- Ticket Detail Modal -->
-  <div class="modal-backdrop" id="ticket-modal">
-    <div class="modal-card">
-      <div class="modal-header">
-        <span class="modal-id" id="modal-ticket-id">INC-2026-XXX</span>
-        <button class="modal-close" id="btn-close-modal">&times;</button>
-      </div>
-      <div class="modal-body" id="modal-ticket-body"></div>
+  <!-- Interactive Judge Demo Controller Bar -->
+  <footer class="demo-controller-bar">
+    <span class="bar-label">⚡ Hackathon Judge Demo Suite:</span>
+    <div class="demo-buttons">
+      <button class="btn btn-primary" onclick="triggerDemo('support')">1. Customer Refund Email</button>
+      <button class="btn btn-primary" onclick="triggerDemo('blocker')">2. Dev Slack Blocker</button>
+      <button class="btn btn-primary" onclick="triggerDemo('bug')">3. Discord Bug Report</button>
+      <button class="btn btn-primary" onclick="triggerDemo('delay')">4. Vendor WhatsApp Delay</button>
+      <button class="btn btn-primary" onclick="triggerDemo('briefing')">5. Founder Briefing</button>
+      <button class="btn btn-danger" onclick="triggerDemo('escalate')">6. SLA Escalation</button>
     </div>
-  </div>
+  </footer>
 
   <script src="/static/js/app.js"></script>
 </body>

@@ -50,8 +50,8 @@ class AgentEngine:
     and calls multi-channel Caspian tools.
     """
 
-    def log_agent_step(self, step_type: str, title: str, details: str):
-        """Format and print colored agent reasoning logs to terminal stdout."""
+    def log_agent_step(self, step_type: str, title: str, details: str, channel: Optional[str] = None):
+        """Format and print colored agent reasoning logs to terminal stdout and broadcast to dashboard."""
         timestamp = datetime.now().strftime("%H:%M:%S")
         prefix = f"{COLOR_BOLD}{COLOR_CYAN}[BLACKBOX AGENT {timestamp}]{COLOR_RESET}"
         
@@ -67,6 +67,20 @@ class AgentEngine:
         elif step_type == "SUCCESS":
             _safe_print(f"{prefix} {COLOR_GREEN}[ACTION COMPLETE]{COLOR_RESET} {COLOR_BOLD}{title}{COLOR_RESET}")
             _safe_print(f"   └─ {details}")
+
+        # Broadcast event to WebSockets Dashboard
+        try:
+            from backend.realtime import realtime_manager
+            asyncio.create_task(realtime_manager.broadcast({
+                "type": "activity_feed_item",
+                "timestamp": datetime.now().strftime("%I:%M %p"),
+                "step_type": step_type,
+                "title": title,
+                "details": details,
+                "channel": channel or "",
+            }))
+        except Exception:
+            pass
 
     # -------------------------------------------------------------
     # AGENT EXPLICIT TOOLS
@@ -96,8 +110,21 @@ class AgentEngine:
         self.log_agent_step(
             "CASPIAN", 
             f"send_message({channel.value.upper()})", 
-            f"Recipient: '{recipient}' | Text: '{text[:60]}...'"
+            f"Recipient: '{recipient}' | Text: '{text[:60]}...'",
+            channel=channel.value,
         )
+
+        # Pulse channel card on dashboard matrix
+        try:
+            from backend.realtime import realtime_manager
+            await realtime_manager.broadcast({
+                "type": "channel_pulse",
+                "channel": channel.value.lower(),
+                "recipient": recipient,
+            })
+        except Exception:
+            pass
+
         msg = await caspian_service.send_message(
             channel=channel,
             recipient_id=recipient,
@@ -176,6 +203,19 @@ class AgentEngine:
         if "refund" in text_lower or "money" in text_lower or "billing" in text_lower:
             self.log_agent_step("THINKING", "Intent Deduction", "Detected Customer Refund Dispute. Category: Customer Support. Priority: High.")
             
+            try:
+                from backend.realtime import realtime_manager
+                await realtime_manager.broadcast({
+                    "type": "agent_decision",
+                    "input_text": text,
+                    "intent": "Customer Refund Dispute",
+                    "category": "Customer Support",
+                    "confidence": 96,
+                    "actions": ["Email Response Sent", "Slack Team Alert Generated", "Telegram Founder Escalation Check"]
+                })
+            except Exception:
+                pass
+
             ticket_id = f"INC-2026-REF-{uuid.uuid4().hex[:4].upper()}"
             await create_ticket(IncidentTicket(
                 id=ticket_id,
